@@ -121,6 +121,9 @@ export adapter; it does not validate a CTform Core solve.
       from the assigned FEM/Gmsh object. `mesh.physicalGroups` contains the group
       names/IDs, and MSH node coordinates are in meters. The FEM preview remains
       visible after export.
+    - Pass: `geometry/workpiece.dxf` and each named tool DXF are readable ASCII
+      DXF profile snapshots with meter coordinates; workpiece DXF edge layers
+      match the physical-group names used by the Gmsh mesh.
     - Pass: both named tools appear in `case.json`; all three load steps appear in
       `loadsteps.json` with their expected tool and BC data.
     - Pass: face/edge conditions reference the same physical-group IDs listed in
@@ -208,5 +211,5 @@ export adapter; it does not validate a CTform Core solve.
   and is exported in meters. Core must preserve physical-group names through its
   initial mesh import and later remeshing.
 - Do not run Core with the v2 package until Core supports the catalog, SI units,
-  MSH physical groups, and local/global scopes. Tool geometry normalization and
-  full preflight remain addon work.
+  MSH physical groups, ASCII DXF role snapshots, and local/global scopes. Full
+  preflight and Core compatibility remain pending.

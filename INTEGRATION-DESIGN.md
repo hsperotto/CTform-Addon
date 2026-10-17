@@ -284,6 +284,12 @@ are pinned from group dimension/name in the generated `.geo`, and MSH coordinate
 are scaled from FreeCAD millimeters to SI meters. Core remeshing must preserve
 the exported physical-group names and IDs.
 
+Role geometry is exported as plain ASCII DXF profile snapshots because the Core
+DXF reader consumes that text format and rejects binary DXF. Workpiece edge
+layers preserve FreeCAD `EdgeN` names so they can match Gmsh physical groups;
+tool profiles use their named tool-profile layer. Both mesh and DXF snapshots are
+scaled to meters and linked from the v2 package.
+
 ### 6. Define load steps and simulation fields
 
 The user defines the minimum run configuration:

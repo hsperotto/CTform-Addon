@@ -62,7 +62,7 @@ CaseConfigLoader
 
 ### New package direction
 
-`case.json` references `materials.json` and puts a `materialId` on each physical workpiece/tool/region. `materials.json` defines each record once. `thermal.json` contains process thermal state and conditions, not conductivity or heat-capacity tables. `loadsteps.json` contains per-step conditions and tool state/motion.
+`case.json` references `materials.json` and puts a `materialId` on each physical workpiece/tool/region. It references the initial Gmsh MSH2 mesh and ASCII DXF snapshots for the workpiece and tools. DXF is text (binary DXF is unsupported by Core); workpiece edge layers match the MSH physical names. `materials.json` defines each material once. `thermal.json` contains process thermal state and conditions, not conductivity or heat-capacity tables. `loadsteps.json` contains per-step conditions and tool state/motion.
 
 ### Simple schema-version and unit policy
 
@@ -108,12 +108,14 @@ Illustrative `case.json` fragment:
   },
   "materialsFile": "materials.json",
   "geometry": {
-    "workpiece": {"file": "workpiece.dxf", "materialId": "steel-42crmo4"},
+    "dxf": {"format": "ascii", "lengthUnit": "m", "coordinateMap": {"r": "x", "z": "y"}, "workpieceLayerMap": {"Edge1": "Edge1"}},
+    "workpiece": {"file": "geometry/workpiece.dxf", "materialId": "steel-42crmo4"},
     "tools": [
-      {"name": "UpperPunch", "file": "upper.dxf", "materialId": "h13-tool-steel"},
-      {"name": "LowerDie", "file": "lower.dxf", "materialId": "h13-tool-steel"}
+      {"id": "tool-upper-id", "name": "UpperPunch", "file": "geometry/tools/tool-upper-id.dxf", "materialId": "h13-tool-steel", "type": "rigid", "toolLayer": "ToolProfile"},
+      {"id": "tool-lower-id", "name": "LowerDie", "file": "geometry/tools/tool-lower-id.dxf", "materialId": "h13-tool-steel", "type": "rigid", "toolLayer": "ToolProfile"}
     ]
-  }
+  },
+  "mesh": {"file": "mesh/workpiece.msh", "lengthUnit": "m", "physicalGroups": []}
 }
 ```
 
@@ -185,6 +187,15 @@ run that refreshes the FEM preview from UNV; it does not serialize mesh elements
 itself. It scales MSH node coordinates to SI meters and pins physical tags from
 group dimension/name. Never treat a separate mesh as identical to the visible
 FreeCAD mesh.
+
+**Role geometry snapshots (settled):** the addon writes ASCII DXF profile
+snapshots for the workpiece and each rigid tool. It uses FreeCAD's
+`importDXF.export` with spline flattening/linear-wire output; Core's parser
+accepts the resulting ASCII LINE/ARC/LWPOLYLINE/CIRCLE/ELLIPSE entities and
+rejects binary DXF. Workpiece `EdgeN` DXF layers match MSH physical-group names;
+tools use a named tool-profile layer. Geometry is transformed to world placement
+and scaled to SI meters before export. Keep explicit case offsets additive and
+avoid applying any placement twice.
 
 **Tool identity and motion (settled):** addon roles are `workpiece` and
 arbitrarily named `tool`. `case.json` defines tool ID, geometry, and material
@@ -364,15 +375,17 @@ before enabling execution.
 ### 2026-10-17: Addon v2 integration slice
 
 - **Implemented in addon:** schema-v2 SI manifest and scientific-notation JSON;
-case-local CTform material catalog with role IDs; process-only thermal sidecar;
-visible contact-pair objects; GmshTools-produced MSH2 and physical-group metadata;
-physical-group condition targets; root-global/step-local scopes with local
-override warnings; export readiness issues.
+case-local CTform material catalog with role IDs; ASCII DXF role snapshots;
+process-only thermal sidecar; visible contact-pair objects; GmshTools-produced
+MSH2 and physical-group metadata; stable tool IDs; physical-group condition
+targets; root-global/step-local scopes with local override warnings; export
+readiness issues.
 - **Validated:** 26 addon Python tests; syntax and diagnostics; FreeCAD 1.1
 material-property conversion probe; FreeCAD/Gmsh full package-export probe with
 MSH2 physical groups and SI node coordinates.
 - **Not implemented in Core:** v2 catalog/SI reader, physical-group ID targeting,
 scope precedence, and stable tool-state merge. Core source was not changed in
 this addon-only stage; v2 packages are marked draft and must not be run yet.
-- **Remaining addon blocker:** export SI-normalized package geometry for rigid
-tools and complete preflight before a case can be marked runnable.
+- **Remaining addon blocker:** complete geometry/material/contact preflight,
+semantic workpiece layer mapping for arbitrary topology, and validation of
+tool placement/offset interaction before a case can be marked runnable.

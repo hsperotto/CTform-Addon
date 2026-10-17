@@ -89,13 +89,16 @@ Implemented modules:
 - `gmsh_package.py`: uses FreeCAD FEM `GmshTools` to save the same Gmsh run as
    native MSH2 for Core and refresh the visible FEM mesh from UNV; no custom mesh
    serialization.
+- `geometry_export.py`: exports each role profile as ASCII DXF, with workpiece
+   `EdgeN` layers matching mesh physical groups and all coordinates scaled to m.
 - `loadsteps.py`: load-step groups that own native mechanical/thermal condition
    children; the `MechanicalBCs` and `ThermalBCs` properties mirror group contents
    for serialization and inspection. Analysis-root conditions are global across
    steps.
 - `case_export.py`: writes the v2 package (`case.json`, `materials.json`,
-  `thermal.json`, `loadsteps.json`, and linked MSH2), including material IDs,
-  physical groups, contact pairs, conditions, and readiness warnings.
+  `thermal.json`, `loadsteps.json`, linked MSH2, and per-role ASCII DXFs),
+  including stable IDs, physical groups, contact pairs, conditions, and
+  readiness warnings.
 - `validation.py`: FreeCAD-independent initial XY-plane validation helpers.
 
 Selected FEM commands exposed in CTform:
@@ -148,6 +151,7 @@ v2 contract described in `Core-Refactor.md`:
 case.json (schemaVersion 2)
    -> materials.json
    -> workpiece.msh (Gmsh MSH2)
+   -> geometry/workpiece.dxf and geometry/tools/*.dxf (ASCII)
    -> thermal.json
    -> loadsteps.json
    -> prepared runtime model
@@ -173,8 +177,9 @@ workflow is more complete.
 
 ### Highest priority
 
-1. Export SI-normalized tool geometry references and add preflight for them;
-   current role source-file links may be empty or reference legacy mm DXF files.
+1. Harden SI-normalized role geometry export and preflight for more CAD shapes;
+   current export supports planar profiles/entities understood by the Core ASCII
+   DXF parser.
 2. Map native FEM convection/radiation fields and initial-temperature conditions
    to Core thermal inputs, including ambient temperature.
 3. Validate contact-pair physical-group references and add conflict/preflight
