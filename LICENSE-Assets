@@ -1,1 +1,7 @@
-Put your assets license in this file. The most common choice for FreeCAD addon assets is CC-BY-SA-4.0.
+The following assets are proprietary and not covered by the LGPL license:
+- CTform logos
+- Branding images
+- Any other trademarked or third-party graphics
+
+These assets may not be redistributed, modified, or reused without explicit permission
+from their respective copyright holders.
