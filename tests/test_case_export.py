@@ -6,12 +6,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from freecad.CTformFreeCADInterface.case_export import (
     case_to_dict,
     loadsteps_to_dict,
     write_case_json,
 )
+from freecad.CTformFreeCADInterface.contacts import contact_pair_to_dict
+from freecad.CTformFreeCADInterface.materials import materials_to_dict
+from freecad.CTformFreeCADInterface.loadsteps import CTformLoadStep, attach_condition
 
 
 class CaseExportTests(unittest.TestCase):
@@ -45,6 +49,10 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(data["simulationName"], "demo")
         self.assertEqual(data["simulation"]["modelingType"], "axisymmetric")
         self.assertEqual(data["contact"]["model"], "node_to_segment")
+        self.assertEqual(data["schemaVersion"], 2)
+        self.assertEqual(data["units"]["length"], "m")
+        self.assertEqual(data["materialsFile"], "materials.json")
+        self.assertAlmostEqual(data["contact"]["initialGap"], 5e-5)
         self.assertEqual(data["geometry"]["tools"], [])
         self.assertIn("solver", data)
 
@@ -77,11 +85,104 @@ class CaseExportTests(unittest.TestCase):
 
         with TemporaryDirectory() as directory:
             path = write_case_json(case, Path(directory) / "case.json")
-            data = json.loads(path.read_text(encoding="utf-8"))
+            case_text = path.read_text(encoding="utf-8")
+            data = json.loads(case_text)
+            self.assertTrue((path.parent / "materials.json").exists())
+            self.assertTrue((path.parent / "thermal.json").exists())
+            self.assertTrue((path.parent / "loadsteps.json").exists())
+
+        def test_writer_links_assigned_fem_gmsh_mesh_into_case_package(self):
+            mesh_object = SimpleNamespace(TypeId="Fem::FemMeshGmsh")
+            role = SimpleNamespace(
+                Role="workpiece",
+                SourceFile="workpiece.dxf",
+                Target=None,
+                Mesh=mesh_object,
+                Material=None,
+                Label="CTform Role: workpiece",
+                InitialOffsetZ=0.0,
+                SymmetryR=0.0,
+            )
+            case = SimpleNamespace(
+                RoleAssignments=[role],
+                Materials=[],
+                ContactPairs=[],
+                LoadSteps=[],
+                Analysis=SimpleNamespace(Group=[]),
+                MeshFile="mesh/workpiece.msh",
+                CaseDirectory="",
+                CaseFile="case.json",
+            )
+
+            def fake_gmsh_export(mesh, output_path):
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text("native gmsh mesh", encoding="utf-8")
+                return {
+                    "format": "gmsh-msh2",
+                    "lengthUnit": "m",
+                    "nodeCount": 4,
+                    "elementCount": 2,
+                    "elementTypes": ["Tri3"],
+                    "physicalGroups": [{"id": 121, "name": "Face1", "dimension": 2}],
+                }
+
+            with TemporaryDirectory() as directory, patch(
+                "freecad.CTformFreeCADInterface.case_export.export_gmsh_mesh",
+                side_effect=fake_gmsh_export,
+            ):
+                path = write_case_json(case, Path(directory) / "case.json")
+                data = json.loads(path.read_text(encoding="utf-8"))
+                mesh_path = path.parent / data["mesh"]["file"]
+                self.assertTrue(mesh_path.exists())
+
+            self.assertEqual(data["mesh"]["format"], "gmsh-msh2")
+            self.assertEqual(data["mesh"]["lengthUnit"], "m")
+            self.assertEqual(data["mesh"]["physicalGroups"][0]["id"], 121)
 
         self.assertEqual(path.name, "case.json")
         self.assertEqual(case.CaseFile, "case.json")
         self.assertEqual(data["simulationName"], "demo")
+        self.assertIn('"initialGap": 5.0000000000000002e-05', case_text)
+
+    def test_material_catalog_uses_named_fields_and_si_values(self):
+        class Quantity:
+            def __init__(self, value):
+                self.value = value
+
+            def getValueAs(self, unit):
+                return self.value
+
+        material = SimpleNamespace(
+            MaterialId="steel-test-001",
+            MaterialName="Test forging steel",
+            Model="HenselSpittel",
+            HenselSpittelA=Quantity(1.2e9),
+            HenselSpittelM1=-1e-3,
+            HenselSpittelM2=-0.2,
+            HenselSpittelM3=0.15,
+            HenselSpittelM4=-0.05,
+            YoungModulus=Quantity(2.1e11),
+            PoissonRatio=0.3,
+            Density=Quantity(7800.0),
+            ThermalExpansionCoefficient=Quantity(1.2e-5),
+            ThermalConductivity=Quantity(30.0),
+            SpecificHeat=Quantity(460.0),
+            YoungModulusTableJSON="[]",
+            ConductivityTableJSON="[]",
+            SpecificHeatTableJSON="[]",
+            FlowStressTableJSON="[]",
+        )
+
+        catalog = materials_to_dict(SimpleNamespace(Materials=[material]))
+        record = catalog["materials"][0]
+
+        self.assertNotIn("schemaVersion", catalog)
+        self.assertNotIn("units", catalog)
+        self.assertEqual(record["id"], "steel-test-001")
+        self.assertEqual(record["constitutive"]["model"], "HenselSpittel")
+        self.assertEqual(record["constitutive"]["parameters"]["A"], 1.2e9)
+        self.assertEqual(record["elastic"]["youngModulus"], 2.1e11)
+        self.assertEqual(record["thermal"]["specificHeat"], 460.0)
 
     def test_named_tools_export_without_directional_roles(self):
         case = SimpleNamespace(
@@ -110,6 +211,7 @@ class CaseExportTests(unittest.TestCase):
                 SimpleNamespace(Role="workpiece", SourceFile="workpiece.dxf"),
                 SimpleNamespace(
                     Role="tool",
+                    ToolId="tool-punch-id",
                     ToolName="Punch",
                     SourceFile="punch.dxf",
                     ToolLayer="Profile",
@@ -119,6 +221,7 @@ class CaseExportTests(unittest.TestCase):
                 ),
                 SimpleNamespace(
                     Role="tool",
+                    ToolId="tool-guide-id",
                     ToolName="GuidePin",
                     SourceFile="guide_pin.dxf",
                     ToolLayer="",
@@ -133,6 +236,8 @@ class CaseExportTests(unittest.TestCase):
 
         self.assertEqual([tool["name"] for tool in tools], ["Punch", "GuidePin"])
         self.assertTrue(all(tool["role"] == "tool" for tool in tools))
+        self.assertEqual([tool["id"] for tool in tools], ["tool-punch-id", "tool-guide-id"])
+        self.assertEqual(tools[0]["initialOffsetZ"], 0.001)
 
     def test_loadsteps_export_matches_core_shape(self):
         condition = SimpleNamespace(
@@ -170,6 +275,465 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(exported["increments"], 190)
         self.assertEqual(exported["mechanicalBCs"][0]["target"], "Symmetry0")
         self.assertEqual(exported["tools"][0]["name"], "Punch")
+
+    def test_native_displacement_maps_xy_to_core_xz_and_axial_selector(self):
+        edge = SimpleNamespace(
+            ShapeType="Edge",
+            BoundBox=SimpleNamespace(YLength=0.0, ZLength=0.0, YMin=4.0),
+        )
+        profile = SimpleNamespace(Shape=SimpleNamespace(getElement=lambda name: edge))
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintDisplacement",
+            Proxy=None,
+            Label="Axial displacement",
+            References=[(profile, ["Edge1"])],
+            xDisplacement=0.0,
+            xFree=True,
+            yDisplacement=-2.0,
+            yFree=False,
+            zDisplacement=0.0,
+            zFree=True,
+            Active=True,
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Press",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=10,
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+
+        exported = loadsteps_to_dict(SimpleNamespace(LoadSteps=[step]))["loadSteps"][0]
+        bc = exported["mechanicalBCs"][0]
+
+        self.assertEqual(bc["axis"], "Z")
+        self.assertEqual(bc["value"], -2.0)
+        self.assertTrue(bc["useZSelector"])
+        self.assertEqual(bc["zSelector"], 0.004)
+
+    def test_native_condition_reference_maps_to_exported_physical_group_id(self):
+        profile = SimpleNamespace(Shape=SimpleNamespace())
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintFixed",
+            Proxy=None,
+            Label="Bottom support",
+            References=[(profile, ["Edge1"])],
+            Active=True,
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Forge",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=1,
+            Group=[condition],
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+        physical_groups = [{"id": 41001, "name": "Edge1", "dimension": 1}]
+
+        exported = loadsteps_to_dict(
+            SimpleNamespace(LoadSteps=[step]), physical_groups
+        )["loadSteps"][0]
+
+        bc = exported["mechanicalBCs"][0]
+        self.assertEqual(bc["physicalGroupId"], 41001)
+        self.assertEqual(bc["physicalGroup"], "Edge1")
+
+    def test_native_displacement_quantity_converts_from_freecad_to_si(self):
+        class Quantity:
+            def getValueAs(self, unit):
+                self.requested_unit = unit
+                return 0.002
+
+        profile = SimpleNamespace(Shape=SimpleNamespace())
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintDisplacement",
+            Proxy=None,
+            Label="Axial displacement",
+            References=[(profile, ["Edge1"])],
+            xDisplacement=0.0,
+            xFree=True,
+            yDisplacement=Quantity(),
+            yFree=False,
+            zDisplacement=0.0,
+            zFree=True,
+            Active=True,
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Press",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=1,
+            Group=[condition],
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+
+        exported = loadsteps_to_dict(
+            SimpleNamespace(LoadSteps=[step]),
+            [{"id": 101, "name": "Edge1", "dimension": 1}],
+        )["loadSteps"][0]
+        bc = exported["mechanicalBCs"][0]
+
+        self.assertEqual(condition.yDisplacement.requested_unit, "m")
+        self.assertEqual(bc["value"], 0.002)
+        self.assertEqual(bc["physicalGroupId"], 101)
+
+    def test_contact_pair_serializes_named_roles_and_physical_group(self):
+        workpiece = SimpleNamespace(Role="workpiece")
+        tool = SimpleNamespace(
+            Role="tool", ToolId="tool-upper-id", ToolName="UpperPunch", Label="UpperPunch"
+        )
+        pair = SimpleNamespace(
+            PairId="pair-001",
+            PairName="Workpiece to UpperPunch",
+            SlaveRole=workpiece,
+            MasterRole=tool,
+            SlavePhysicalGroup="EdgeTop",
+            MasterPhysicalGroup="ContactFace",
+            GapTolerance=0.25,
+            FrictionModel="coulomb",
+            FrictionCoefficient=0.22,
+            LevanovM=0.3,
+            LevanovN=1.25,
+            ThermalEnabled=True,
+            HeatTransferCoefficient=1800.0,
+            Active=True,
+        )
+
+        data = contact_pair_to_dict(
+            pair,
+            [{"id": 7102, "name": "EdgeTop", "dimension": 1}],
+        )
+
+        self.assertEqual(data["id"], "pair-001")
+        self.assertEqual(data["slave"]["physicalGroupId"], 7102)
+        self.assertEqual(data["master"]["name"], "UpperPunch")
+        self.assertEqual(data["masterToolId"], "tool-upper-id")
+        self.assertEqual(data["friction"]["coefficient"], 0.22)
+        self.assertEqual(data["gapTolerance"], 0.00025)
+
+    def test_native_tool_displacement_becomes_step_tool_velocity(self):
+        tool_profile = SimpleNamespace()
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintDisplacement",
+            Proxy=None,
+            Label="Punch displacement",
+            References=[(tool_profile, ["Edge1"])],
+            xDisplacement=0.0,
+            xFree=True,
+            yDisplacement=-6.0,
+            yFree=False,
+            zDisplacement=0.0,
+            zFree=True,
+            Active=True,
+        )
+        assignment = SimpleNamespace(
+            Role="tool", ToolId="tool-punch-id", Target=tool_profile,
+            ToolName="Punch", Label="CTform Tool: Punch"
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Press",
+            StartTime=0.0,
+            EndTime=2.0,
+            Increments=20,
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+
+        exported = loadsteps_to_dict(
+            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+        )["loadSteps"][0]
+
+        self.assertEqual(exported["mechanicalBCs"], [])
+        self.assertEqual(exported["tools"][0]["name"], "Punch")
+        self.assertEqual(exported["tools"][0]["toolId"], "tool-punch-id")
+        self.assertEqual(exported["tools"][0]["vz"], -3.0)
+
+    def test_native_fixed_tool_becomes_zero_velocity(self):
+        tool_profile = SimpleNamespace()
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintFixed",
+            Proxy=None,
+            Label="Fixed lower die",
+            References=[(tool_profile, ["Face1"])],
+            Active=True,
+        )
+        assignment = SimpleNamespace(
+            Role="tool", ToolId="tool-lower-id", Target=tool_profile,
+            ToolName="LowerDie", Label="CTform Tool: LowerDie"
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Forge",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=10,
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+
+        exported = loadsteps_to_dict(
+            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+        )["loadSteps"][0]
+
+        self.assertEqual(exported["mechanicalBCs"], [])
+        self.assertEqual(exported["tools"][0]["name"], "LowerDie")
+        self.assertEqual(exported["tools"][0]["toolId"], "tool-lower-id")
+        self.assertEqual(exported["tools"][0]["vx"], 0.0)
+        self.assertEqual(exported["tools"][0]["vz"], 0.0)
+
+    def test_drag_and_attach_command_grouping_export_identically(self):
+        class StepObject:
+            def __init__(self):
+                self.Group = []
+                self.MechanicalBCs = []
+                self.ThermalBCs = []
+                self.ToolMotions = []
+                self.Proxy = object.__new__(CTformLoadStep)
+                self.StepId = 1
+                self.StepName = "Forge"
+                self.StartTime = 0.0
+                self.EndTime = 1.0
+                self.Increments = 1
+
+            def addObject(self, condition):
+                self.Group.append(condition)
+                self.Proxy.onChanged(self, "Group")
+
+        def fixed_condition():
+            return SimpleNamespace(
+                TypeId="Fem::ConstraintFixed",
+                Proxy=None,
+                Label="Fixed workpiece region",
+                References=[],
+                Active=True,
+            )
+
+        dragged_step = StepObject()
+        dragged_condition = fixed_condition()
+        dragged_step.Group.append(dragged_condition)
+        dragged_step.Proxy.onChanged(dragged_step, "Group")
+
+        attached_step = StepObject()
+        attach_condition(attached_step, fixed_condition())
+
+        dragged_export = loadsteps_to_dict(SimpleNamespace(LoadSteps=[dragged_step]))
+        attached_export = loadsteps_to_dict(SimpleNamespace(LoadSteps=[attached_step]))
+        self.assertEqual(dragged_export, attached_export)
+        self.assertEqual(len(dragged_step.MechanicalBCs), 1)
+        self.assertEqual(len(attached_step.MechanicalBCs), 1)
+
+    def test_analysis_root_conditions_apply_to_every_load_step(self):
+        global_condition = SimpleNamespace(
+            TypeId="Fem::ConstraintFixed",
+            Proxy=None,
+            Label="Global workpiece support",
+            References=[],
+            Active=True,
+        )
+        steps = [
+            SimpleNamespace(
+                StepId=step_id,
+                StepName=f"Step {step_id}",
+                StartTime=float(step_id - 1),
+                EndTime=float(step_id),
+                Increments=1,
+                Group=[],
+                MechanicalBCs=[],
+                ThermalBCs=[],
+                ToolMotions=[],
+            )
+            for step_id in (1, 2)
+        ]
+        case = SimpleNamespace(
+            Analysis=SimpleNamespace(Group=[global_condition]),
+            LoadSteps=steps,
+        )
+
+        exported_steps = loadsteps_to_dict(case)["loadSteps"]
+
+        self.assertEqual(len(exported_steps), 2)
+        self.assertTrue(all(len(step["mechanicalBCs"]) == 1 for step in exported_steps))
+        self.assertEqual(
+            [step["mechanicalBCs"][0]["name"] for step in exported_steps],
+            ["Global workpiece support", "Global workpiece support"],
+        )
+
+    def test_step_local_condition_overrides_root_and_emits_warning(self):
+        global_condition = SimpleNamespace(
+            TypeId="Fem::ConstraintFixed",
+            Proxy=None,
+            Label="Global support",
+            Type="Fixed",
+            Target="Bottom",
+            Axis="Z",
+            Value=0.0,
+            Active=True,
+        )
+        local_condition = SimpleNamespace(
+            TypeId="Fem::ConstraintFixed",
+            Proxy=None,
+            Label="Step support",
+            Type="Fixed",
+            Target="Bottom",
+            Axis="Z",
+            Value=0.0,
+            Active=True,
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Forge",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=1,
+            Group=[local_condition],
+            MechanicalBCs=[local_condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+        case = SimpleNamespace(
+            Analysis=SimpleNamespace(Group=[global_condition]),
+            LoadSteps=[step],
+            RoleAssignments=[],
+        )
+
+        exported = loadsteps_to_dict(case)
+        records = exported["loadSteps"][0]["mechanicalBCs"]
+
+        self.assertEqual([record["scope"] for record in records], ["global", "step"])
+        self.assertTrue(records[1]["overridesGlobal"])
+        self.assertEqual(len(exported["warnings"]), 1)
+        self.assertIn("Step support", exported["warnings"][0])
+        self.assertIn("Global support", exported["warnings"][0])
+
+    def test_native_tool_force_becomes_force_control(self):
+        tool_profile = SimpleNamespace()
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintForce",
+            Proxy=None,
+            Label="Punch force",
+            References=[(tool_profile, ["Edge1"])],
+            Force=500.0,
+            Direction=SimpleNamespace(x=0.0, y=1.0, z=0.0),
+            Active=True,
+        )
+        assignment = SimpleNamespace(
+            Role="tool", ToolId="tool-punch-id", Target=tool_profile,
+            ToolName="Punch", Label="CTform Tool: Punch"
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Press",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=10,
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+
+        exported = loadsteps_to_dict(
+            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+        )["loadSteps"][0]
+
+        self.assertEqual(exported["tools"][0]["forceTarget"], 500.0)
+        self.assertEqual(exported["tools"][0]["motion"]["axis"], "Z")
+
+    def test_native_tool_temperature_becomes_step_tool_temperature(self):
+        tool_profile = SimpleNamespace()
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintTemperature",
+            Proxy=None,
+            Label="Punch temperature",
+            References=[(tool_profile, ["Face1"])],
+            Temperature=650.0,
+            Active=True,
+        )
+        assignment = SimpleNamespace(
+            Role="tool", ToolId="tool-punch-id", Target=tool_profile,
+            ToolName="Punch", Label="CTform Tool: Punch"
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Heat",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=1,
+            MechanicalBCs=[],
+            ThermalBCs=[condition],
+            ToolMotions=[],
+        )
+
+        exported = loadsteps_to_dict(
+            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+        )["loadSteps"][0]
+
+        self.assertEqual(exported["thermalBCs"], [])
+        self.assertEqual(exported["tools"][0]["initialTemperature"], 650.0)
+
+    def test_native_workpiece_force_is_rejected(self):
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintForce",
+            Proxy=None,
+            Label="Unsupported workpiece force",
+            References=[],
+            Force=500.0,
+            Direction=SimpleNamespace(x=0.0, y=1.0, z=0.0),
+            Active=True,
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Press",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=1,
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+
+        with self.assertRaisesRegex(ValueError, "force conditions only as force-controlled tool motion"):
+            loadsteps_to_dict(SimpleNamespace(LoadSteps=[step]))
+
+    def test_native_body_heat_source_maps_to_heat_generation(self):
+        profile = SimpleNamespace(Shape=SimpleNamespace())
+        proxy = type("ConstraintBodyHeatSource", (), {})()
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintPython",
+            Proxy=proxy,
+            Label="Workpiece heat source",
+            References=[(profile, [])],
+            HeatSource=12.5,
+            Active=True,
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Heat",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=1,
+            MechanicalBCs=[],
+            ThermalBCs=[condition],
+            ToolMotions=[],
+        )
+
+        exported = loadsteps_to_dict(SimpleNamespace(LoadSteps=[step]))["loadSteps"][0]
+        bc = exported["thermalBCs"][0]
+
+        self.assertEqual(bc["type"], "HeatGeneration")
+        self.assertEqual(bc["value"], 12.5)
+        self.assertEqual(bc["target"], "All")
 
 
 if __name__ == "__main__":

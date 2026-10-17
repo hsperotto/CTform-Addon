@@ -3,6 +3,8 @@
 
 """CTform role assignments over native FreeCAD document objects."""
 
+import uuid
+
 
 ROLE_NAMES = ("workpiece", "tool")
 
@@ -13,6 +15,12 @@ class CTformRoleAssignment:
     def __init__(self, obj):
         self.Object = obj
         self._add_properties()
+
+    def dumps(self):
+        return None
+
+    def loads(self, state):
+        return None
 
     def _add_properties(self):
         obj = self.Object
@@ -28,6 +36,8 @@ class CTformRoleAssignment:
             obj.addProperty("App::PropertyLink", "Material", "CTform")
         if "ToolName" not in obj.PropertiesList:
             obj.addProperty("App::PropertyString", "ToolName", "CTform")
+        if "ToolId" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyString", "ToolId", "CTform")
         if "SourceFile" not in obj.PropertiesList:
             obj.addProperty("App::PropertyString", "SourceFile", "Export")
         if "ToolLayer" not in obj.PropertiesList:
@@ -38,8 +48,12 @@ class CTformRoleAssignment:
         if "SymmetryR" not in obj.PropertiesList:
             obj.addProperty("App::PropertyFloat", "SymmetryR", "Export")
             obj.SymmetryR = 0.0
+        if getattr(obj, "Role", "") == "tool" and not getattr(obj, "ToolId", ""):
+            obj.ToolId = uuid.uuid4().hex
 
-    def onDocumentRestored(self):
+    def onDocumentRestored(self, obj=None):
+        if obj is not None:
+            self.Object = obj
         self._add_properties()
 
 
@@ -59,10 +73,19 @@ def make_role_assignment(
     obj.Proxy = CTformRoleAssignment(obj)
     obj.Role = role
     obj.ToolName = tool_name if role == "tool" else ""
+    if role == "tool" and not obj.ToolId:
+        obj.ToolId = uuid.uuid4().hex
     obj.Target = target
     obj.Label = f"CTform Tool: {tool_name}" if role == "tool" and tool_name else f"CTform Role: {role}"
     analysis.addObject(obj)
-    case = getattr(analysis, "CTformCase", None)
+    case = next(
+        (
+            member
+            for member in (getattr(analysis, "Group", ()) or ())
+            if type(getattr(member, "Proxy", None)).__name__ == "CTformCase"
+        ),
+        None,
+    )
     if case is not None:
         assignments = list(case.RoleAssignments)
         assignments.append(obj)

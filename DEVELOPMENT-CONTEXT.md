@@ -30,15 +30,17 @@ This file is a handoff note for resuming development.
    `ctform3_api` or `ctform3_cli` later.
 6. Native FEM geometry, material, mesh, mechanical constraints, thermal
    constraints, and results remain native objects.
-7. CTform-specific objects are limited to roles, tool motion, contacts, load-step
-   scheduling, case export, and Core execution.
+7. CTform-specific objects are limited to roles, contacts, load-step scheduling,
+   case export, and Core execution. Native FEM conditions remain the source of
+   truth; tool motion is mapped from native FEM conditions during export.
 8. No custom folders are added inside the FEM analysis. Load steps are the
    exception: each `CTformLoadStep` is an expandable
    `App::DocumentObjectGroupPython` directly under the analysis.
 9. Tool roles are only `workpiece` and `tool`. Tools have arbitrary explicit names
    through `ToolName`; there are no upper/lower/fixture roles.
-10. The case package remains split into focused files:
-    `case.json`, `material.json`, `thermal.json`, and `loadsteps.json`.
+10. New case packages use `case.json`, `materials.json`, `thermal.json`,
+   `loadsteps.json`, and a native Gmsh MSH2 mesh artifact. Legacy singular
+   `material.json` remains a Core migration input.
 
 ## Golden workflow
 
@@ -46,11 +48,14 @@ This file is a handoff note for resuming development.
 Create CTform Case
 -> Create geometry with Part/Sketcher/Draft/FEM tools
 -> Assign workpiece/tool roles with explicit tool names
--> Create or reuse FEM materials
+-> Create/assign CTform material catalog entries
 -> Create/refine a 2D Gmsh mesh
+-> Assign the FEM/Gmsh mesh to the workpiece role
+-> Create visible workpiece/tool contact pairs
 -> Create load-step folders
--> Attach native FEM mechanical and thermal conditions to steps
--> Add named tool motions to steps
+-> Create native FEM mechanical and thermal conditions
+-> Drag/attach conditions into a step; leave global conditions at analysis root
+-> Clone steps with the CTform Clone Load Step command
 -> Export the complete case package
 -> Run CTform Core
 -> Inspect results
@@ -73,15 +78,24 @@ Implemented modules:
 - `init_gui.py`: registers CTform and loads selected FEM commands lazily.
 - `analysis.py`: creates native `Fem::FemAnalysis`, CTform case settings, and a
   FEM-compatible CTform solver/job object.
-- `commands.py`: creates cases and solvers, assigns roles, creates load steps,
-  adds prototype mechanical BCs/tool motions, exports cases, and exposes selected
-  FEM material/Gmsh commands.
+- `commands.py`: creates cases, solvers, and CTform materials; assigns roles,
+  materials, and FEM meshes; creates contact pairs/load steps; attaches and
+  detaches native FEM conditions; clones steps; exports cases.
 - `roles.py`: role assignment objects linking native objects to `workpiece` or
   named `tool` roles.
-- `loadsteps.py`: load-step folder objects, mechanical/thermal link lists, and
-  CTform tool-motion objects.
-- `case_export.py`: writes `case.json` and `loadsteps.json`, including role,
-  load-step, mechanical-BC, thermal-BC, and tool-motion serialization.
+- `materials.py`: CTform-owned material records with stable IDs, named
+   constitutive parameters, unit-aware scalar properties, and table fields.
+- `contacts.py`: visible workpiece-to-tool contact pairs and v2 serialization.
+- `gmsh_package.py`: uses FreeCAD FEM `GmshTools` to save the same Gmsh run as
+   native MSH2 for Core and refresh the visible FEM mesh from UNV; no custom mesh
+   serialization.
+- `loadsteps.py`: load-step groups that own native mechanical/thermal condition
+   children; the `MechanicalBCs` and `ThermalBCs` properties mirror group contents
+   for serialization and inspection. Analysis-root conditions are global across
+   steps.
+- `case_export.py`: writes the v2 package (`case.json`, `materials.json`,
+  `thermal.json`, `loadsteps.json`, and linked MSH2), including material IDs,
+  physical groups, contact pairs, conditions, and readiness warnings.
 - `validation.py`: FreeCAD-independent initial XY-plane validation helpers.
 
 Selected FEM commands exposed in CTform:
@@ -93,17 +107,24 @@ Selected FEM commands exposed in CTform:
 - `FEM_MeshGroup`
 - `FEM_MeshDisplayInfo`
 - `FEM_MeshClear`
+- Native FEM fixed, displacement, force, temperature, heat-flux, and body-heat
+   source commands, plus CTform material, mesh assignment, contact-pair, attach,
+   detach, and clone-step actions.
 
 No FEM solver commands are exposed in CTform menus.
 
 ## Current validation
 
-The addon currently has 7 passing Python tests. Python compilation and diagnostics
+The addon currently has 26 passing Python tests. Python compilation and diagnostics
 also pass. The FreeCAD runtime smoke tests already confirmed that the workbench
-appears and can create a case; the native FEM case/solver and load-step folder
-changes still need a fresh interactive smoke test.
+appears and can create a case; the updated native condition, material, mesh, and
+load-step workflow in `MANUAL-SMOKE-TEST.md` still needs a fresh interactive run.
 
 ## CTform Core findings
+
+Before changing Core's input, material, geometry, or runtime contracts, read
+[`Core-Refactor.md`](Core-Refactor.md). Keep its assumption/problem log current
+whenever investigation establishes a new fact, decision, or unresolved issue.
 
 The CTform source is at:
 
@@ -120,25 +141,28 @@ Relevant existing integration layer:
 - `CasePrepared`: caches prepared models using a fingerprint that includes the
   case, material, loadsteps, thermal, mesh, and tool files.
 
-The current Core contract is:
+Core currently reads the legacy contract; the addon writer targets the accepted
+v2 contract described in `Core-Refactor.md`:
 
 ```text
-case.json
-    -> material.json
-    -> thermal.json
-    -> loadsteps.json
-    -> prepared runtime model
-    -> ctform3_cli execution
+case.json (schemaVersion 2)
+   -> materials.json
+   -> workpiece.msh (Gmsh MSH2)
+   -> thermal.json
+   -> loadsteps.json
+   -> prepared runtime model
+   -> ctform3_cli execution
 ```
 
 `loadsteps.json` is essential. It is parsed into runtime `LoadStep` objects and
 controls time windows, increments, mechanical BCs, thermal BCs, tool motions,
 tool thermal state, runtime timesteps, and contact scheduling.
 
-Global thermal data comes from `thermal.json`; step-specific thermal conditions
-come from `loadsteps.json` and are merged into each runtime step. Mechanical BCs
-are step-specific. Tool identity belongs in `case.json`, while tool motion and
-thermal state belong in `loadsteps.json`.
+Root mechanical conditions are serialized as global scope; step conditions are
+local and override conflicts with warnings. Global thermal conditions live in
+`thermal.json`; step-local thermal conditions live in `loadsteps.json`. Tool
+identity/material belongs in `case.json`; per-step tool state lives in
+`loadsteps.json`.
 
 The current Core examples still use `upper` and `lower` tool roles. The addon
 intentionally uses generic named tools instead. Core refactoring to merge tool
@@ -149,16 +173,15 @@ workflow is more complete.
 
 ### Highest priority
 
-1. Replace the prototype custom mechanical-BC creation path with commands that
-   attach selected native FEM mechanical constraints to a load-step folder.
-2. Add the equivalent native FEM thermal-condition attachment path.
-3. Add a proper thermal configuration/material exporter:
-   - FEM material data -> `material.json`
-   - thermal material tables/global thermal settings -> `thermal.json`
-4. Add mesh and geometry export/reference handling. Current role export can still
-   produce empty `file` values for native FreeCAD objects.
-5. Add CTform contact-interface objects and export them by named workpiece/tool.
-6. Add a minimal solver configuration and run command after the exported package
+1. Export SI-normalized tool geometry references and add preflight for them;
+   current role source-file links may be empty or reference legacy mm DXF files.
+2. Map native FEM convection/radiation fields and initial-temperature conditions
+   to Core thermal inputs, including ambient temperature.
+3. Validate contact-pair physical-group references and add conflict/preflight
+   diagnostics for arbitrary groups and complex pair topology.
+4. Resolve Core's global-tool plus per-step-tool merge behavior before running
+   cases with multiple named tools.
+5. Add a minimal solver configuration and run command after the exported package
    is complete.
 
 ### Later/deferred
@@ -175,8 +198,13 @@ workflow is more complete.
 ## Design rules for the next session
 
 - Do not create a second geometry/material/mesh/constraint system.
+- Keep native FEM conditions as the source of truth; CTform load-step groups own
+   attached conditions and define their step scope. Drag and attach-command paths
+   must stay equivalent.
 - Do not restore upper/lower/fixture role semantics.
 - Do not expose unrelated FEM solvers in CTform.
+- New addon packages use v2 SI values, `materials.json`, and native MSH2 mesh
+   references; don't regress to a custom mesh writer or singular new material file.
 - Keep native FEM objects as the source of truth and use CTform objects for
   scheduling, mapping, contact, tool motion, and Core integration.
 - Treat the JSON files as an export package, not as the primary FreeCAD document

@@ -18,6 +18,10 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 		import Fem
 		import FemGui
 		import femcommands.commands
+		import Part
+		import PartGui
+		import Sketcher
+		import SketcherGui
 
 		from . import commands
 
@@ -27,8 +31,7 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"CTform_CreateCase",
 				"CTform_AssignRole",
 				"CTform_CreateLoadStep",
-				"CTform_AddMechanicalBC",
-				"CTform_AddToolMotion",
+				"CTform_CloneLoadStep",
 				"CTform_CreateSolver",
 				"CTform_ExportCase",
 			],
@@ -39,24 +42,42 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"CTform_CreateCase",
 				"CTform_AssignRole",
 				"CTform_CreateLoadStep",
-				"CTform_AddMechanicalBC",
-				"CTform_AddToolMotion",
+				"CTform_CloneLoadStep",
 				"CTform_CreateSolver",
 				"CTform_ExportCase",
 			],
 		)
 		self.appendMenu(
+			["CTform", "Contact"],
+			["CTform_CreateContactPair"],
+		)
+		self.appendToolbar(
+			"CTform Contact",
+			["CTform_CreateContactPair"],
+		)
+		self.appendMenu(
 			["CTform", "Materials"],
-			["FEM_MaterialEditor", "FEM_MaterialSolid"],
+			[
+				"CTform_CreateMaterial",
+				"CTform_AssignMaterial",
+				"FEM_MaterialEditor",
+				"FEM_MaterialSolid",
+			],
 		)
 		self.appendToolbar(
 			"CTform Materials",
-			["FEM_MaterialEditor", "FEM_MaterialSolid"],
+			[
+				"CTform_CreateMaterial",
+				"CTform_AssignMaterial",
+				"FEM_MaterialEditor",
+				"FEM_MaterialSolid",
+			],
 		)
 		self.appendMenu(
 			["CTform", "Mesh"],
 			[
 				"FEM_MeshGmshFromShape",
+				"CTform_AssignMesh",
 				"FEM_MeshRegion",
 				"FEM_MeshGroup",
 				"FEM_MeshDisplayInfo",
@@ -65,7 +86,46 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 		)
 		self.appendToolbar(
 			"CTform Mesh",
-			["FEM_MeshGmshFromShape", "FEM_MeshRegion", "FEM_MeshGroup"],
+			[
+				"FEM_MeshGmshFromShape",
+				"CTform_AssignMesh",
+				"FEM_MeshRegion",
+				"FEM_MeshGroup",
+			],
+		)
+		self.appendMenu(
+			["CTform", "Geometry"],
+			["Part_MakeFace"],
+		)
+		self.appendToolbar(
+			"CTform Geometry",
+			["Sketcher_NewSketch", "Part_MakeFace"],
+		)
+		self.appendMenu(
+			["CTform", "Conditions"],
+			[
+				"FEM_ConstraintFixed",
+				"FEM_ConstraintDisplacement",
+				"FEM_ConstraintForce",
+				"FEM_ConstraintTemperature",
+				"FEM_ConstraintHeatflux",
+				"FEM_ConstraintBodyHeatSource",
+				"CTform_AttachConditionToStep",
+				"CTform_DetachConditionFromStep",
+			],
+		)
+		self.appendToolbar(
+			"CTform Conditions",
+			[
+				"FEM_ConstraintFixed",
+				"FEM_ConstraintDisplacement",
+				"FEM_ConstraintForce",
+				"FEM_ConstraintTemperature",
+				"FEM_ConstraintHeatflux",
+				"FEM_ConstraintBodyHeatSource",
+				"CTform_AttachConditionToStep",
+				"CTform_DetachConditionFromStep",
+			],
 		)
 
 	def GetClassName(self):

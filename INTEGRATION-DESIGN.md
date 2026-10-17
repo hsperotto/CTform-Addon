@@ -91,8 +91,8 @@ The mapping should remain explicit:
 | Mechanical formulation | `simulation.mechanicalFormulation` |
 | Role assignments | `geometry.workpiece`, `geometry.tools[*].role` |
 | Native geometry references | `geometry.workpiece`, tool files, or exported geometry files |
-| FEM/Gmsh mesh object and settings | `mesh` and its referenced mesh file |
-| Material objects | `materialFile` and material data |
+| FreeCAD FEM/Gmsh mesh object and settings | Authoritative initial `mesh` file plus stable physical-group IDs; Core remesh preserves those IDs |
+| CTform material objects/catalog | `materialsFile` (`materials.json`) plus stable `materialId` references on workpiece/tools/regions |
 | Contact and friction objects | `contact`, `contactInterfaces` |
 | Load-step objects | `loadStepsFile` and `loadsteps.json` |
 | Output settings | `output` |
@@ -103,6 +103,12 @@ export must be deterministic and must not require the standalone legacy GUI. A
 case directory should be treated as a derived, inspectable artifact of the
 FreeCAD case. Opening an existing case should reconstruct or link the
 corresponding FreeCAD objects where possible.
+
+New package format uses one integer `schemaVersion` in `case.json` for the whole
+package; unversioned cases are legacy v1 and the new writer emits v2. V2 physical
+values are unprefixed SI quantities in scientific notation. The UI may display
+prefixed SI values and converts at the package boundary. Core may keep its
+existing internal unit system, but converts once in its v2 loader.
 
 The case object should therefore expose case-level properties such as the
 simulation name, process, modeling type, formulation, case directory, and case
@@ -116,8 +122,11 @@ The first supported CTform model is planar in the XY plane:
 
 - Simulation geometry must lie at `z = 0` within a configurable tolerance.
 - CTform operations must reject solids and unsupported non-planar geometry.
-- Mesh generation must produce a 2D mesh and reject volumetric elements.
-- Exported nodes must have zero Z coordinates after validation.
+- FreeCAD FEM/Gmsh creates the authoritative initial 2D solver mesh; export that
+  mesh and its physical-group IDs. Reject volumetric or unsupported elements.
+- Exported geometry and mesh coordinates use SI meters; UI display units may use
+  prefixes. Sketch X maps to radial Core X and sketch Y maps to axial Core Z.
+- Exported nodes must lie on the XY plane after unit conversion and validation.
 - Material, boundary-condition, and result references must resolve to planar
   geometry or 2D mesh entities.
 
@@ -184,20 +193,45 @@ Boundary conditions are part of the simulation setup and must be visible in the
 CTform workbench. FEM provides a useful vocabulary and many reusable task-panel
 patterns, but its complete constraint catalog should not be copied into CTform.
 
-Candidate FEM constraints should be reused or wrapped only when their meaning is
-clear in a CTform forging model:
+The CTform Conditions toolbar reuses FEM task-panel commands and keeps the FEM
+condition objects native. A CTform load step is a document group: a condition
+becomes step-local when it is dragged into the group or added with **Attach
+Selected Condition to Load Step**. Both actions produce the same group child and
+export result. Because this analysis is CTform-only, the step group is the
+condition's owner after attachment. Conditions left at the analysis root are
+global and are inherited by every load step. Detaching returns the condition to
+that root. **Clone Load Step** copies its schedule and creates independent native
+condition objects that retain their geometry references.
+
+When a step-local condition overlaps a root-global condition on the same
+physical group and degree of freedom, the local condition takes precedence and
+preflight warns with both condition names. Non-overlapping components and
+targets remain active.
+
+The supported forging mapping is deliberately narrower than the full FEM catalog:
 
 | FEM concept | CTform treatment |
 | --- | --- |
-| Fixed constraint | Wrap as a CTform support or fixed-region condition. |
-| Displacement constraint | Wrap as prescribed tool/workpiece motion. |
-| Force constraint | Reuse only for a genuine applied process load. |
-| Pressure constraint | Reuse only where the CTform process model accepts pressure. |
-| Temperature constraint | Keep for a later thermal workflow. |
+| Fixed constraint | Native FEM condition; export as a fixed workpiece-region condition or zero-motion state on a named tool. |
+| Displacement constraint | Native FEM condition; export as a workpiece displacement or, on a named tool role, as per-step tool velocity. |
+| Force constraint | Native FEM condition; supported only on a named tool role, where it selects CTform force control. |
+| Temperature constraint | Native FEM condition; export as a workpiece thermal condition or tool temperature state. |
+| Heat-flux constraint | Native FEM condition; export as a workpiece thermal condition. |
+| Body heat source | Native FEM condition; export as CTform heat generation on the workpiece. |
+| Pressure constraint | Not exposed yet. Core needs a pressure traction implementation; treating pressure as displacement or a point force would be incorrect. Forging contact already computes interface pressure. |
+| FEM contact/tie and other solver-specific constraints | Not exposed. CTform owns its contact-pair model, and these FEM constraints do not map to its rigid-profile contact contract. |
+| Initial temperature | Not a per-step boundary condition. Add after the case-level thermal input supports geometry-role mapping. |
+
+Native FEM condition subelements resolve to physical groups from the assigned
+FreeCAD/Gmsh mesh. The exporter writes the group ID and name alongside the same
+physical groups embedded in the MSH2 file. A selected subelement with no matching
+physical group is rejected instead of being guessed as `All` or a coordinate
+selector.
+
 For the first axisymmetric workflow, the minimum boundary-condition set should
 
-- a fixed or constrained tool region
-- prescribed tool motion or displacement per load step
+- a fixed workpiece region where needed
+- prescribed workpiece or tool displacement per load step
 - workpiece/tool contact pairs
 - friction parameters
 - optional initial gap and positioning
@@ -213,12 +247,20 @@ Thermal conditions (later)
 ```
 ### 4. Assign materials
 
-The user assigns a material to each simulation region. The material task panel
-should expose only properties required by CTform Core, while retaining a clear
-mapping to FreeCAD/FEM material concepts where useful.
+The user assigns a CTform material to each simulation region. New case packages
+use a case-scoped `materials.json` catalog; the workpiece, each tool, and future
+regions reference catalog entries by stable `materialId` in `case.json`.
+`thermal.json` contains case/process thermal state and conditions, not intrinsic
+material properties such as conductivity or heat capacity.
 
-For the first demo, one workpiece material and tool material defaults are enough.
-The data model must still support separate materials for each eligible region.
+Native FEM materials may seed or display compatible scalar properties, but the
+CTform material record is authoritative for simulation. CTform constitutive laws
+and temperature-dependent flow data must not be hidden in generic FEM fields.
+Export a deterministic snapshot with the case package so runs do not depend on a
+mutable global FreeCAD material library.
+
+The first demo may use one workpiece material and a shared tool material, but the
+catalog and assignments must support distinct materials per eligible region.
 
 ### 5. Generate and inspect the 2D Gmsh mesh
 
@@ -233,6 +275,14 @@ show the mesh before execution and validate that:
 Tools may remain profile geometry rather than being independently meshed if that
 matches the CTform Core contract. The UI should make this distinction explicit
 instead of suggesting that every object is a deformable mesh.
+
+The workpiece's assigned `Fem::FemMeshGmsh` is the authoritative initial solver
+mesh. Package export uses FreeCAD's `GmshTools` with that object's shape and
+settings to save a native Gmsh MSH2 file; it does not serialize FEM elements
+itself. The same run refreshes the visible FEM mesh from UNV. Physical group IDs
+are pinned from group dimension/name in the generated `.geo`, and MSH coordinates
+are scaled from FreeCAD millimeters to SI meters. Core remeshing must preserve
+the exported physical-group names and IDs.
 
 ### 6. Define load steps and simulation fields
 

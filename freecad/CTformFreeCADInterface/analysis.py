@@ -12,6 +12,12 @@ class CTformCase:
         self.Analysis = analysis
         self._add_properties()
 
+    def dumps(self):
+        return None
+
+    def loads(self, state):
+        return None
+
     def _add_properties(self):
         obj = self.Object
         self._add_case_properties()
@@ -23,6 +29,8 @@ class CTformCase:
             ("Process", "Case", "forging"),
             ("CaseDirectory", "Case", ""),
             ("CaseFile", "Case", "case.json"),
+            ("MaterialsFile", "Files", "materials.json"),
+            ("MeshFile", "Files", "workpiece.msh"),
             ("MaterialFile", "Files", "material.json"),
             ("LoadStepsFile", "Files", "loadsteps.json"),
             ("ThermalFile", "Files", "thermal.json"),
@@ -44,11 +52,34 @@ class CTformCase:
                 setattr(obj, name, values)
                 setattr(obj, name, default)
 
-        integer_properties = (("VtkEvery", "Output", 1),)
+        integer_properties = (
+            ("PackageSchemaVersion", "Files", 2),
+            ("VtkEvery", "Output", 1),
+        )
         for name, group, default in integer_properties:
             if name not in obj.PropertiesList:
                 obj.addProperty("App::PropertyInteger", name, group)
                 setattr(obj, name, default)
+        obj.setEditorMode("PackageSchemaVersion", 1)
+        obj.setEditorMode("MaterialFile", 2)
+
+        thermal_float_properties = (
+            ("WorkpieceInitialTemperature", "Thermal", 293.15),
+            ("ToolInitialTemperature", "Thermal", 293.15),
+            ("ThermalPlasticEfficiency", "Thermal", 0.9),
+            ("ThermalFrictionEfficiency", "Thermal", 0.0),
+            ("FrictionHeatPartitionToWorkpiece", "Thermal", 1.0),
+            ("FrictionHeatLayerDepth", "Thermal", 0.5),
+        )
+        for name, group, default in thermal_float_properties:
+            if name not in obj.PropertiesList:
+                obj.addProperty("App::PropertyFloat", name, group)
+                setattr(obj, name, default)
+
+        if "FrictionHeatDistribution" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyEnumeration", "FrictionHeatDistribution", "Thermal")
+            obj.FrictionHeatDistribution = ["uniform", "exponential"]
+            obj.FrictionHeatDistribution = "uniform"
 
         float_properties = (
             ("TargetCompression", "Run", 7.0),
@@ -77,6 +108,10 @@ class CTformCase:
 
         if "RoleAssignments" not in obj.PropertiesList:
             obj.addProperty("App::PropertyLinkList", "RoleAssignments", "CTform")
+        if "Materials" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyLinkList", "Materials", "CTform")
+        if "ContactPairs" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyLinkList", "ContactPairs", "CTform")
         if "LoadSteps" not in obj.PropertiesList:
             obj.addProperty("App::PropertyLinkList", "LoadSteps", "CTform")
 
@@ -95,7 +130,20 @@ class CTformCase:
             obj.Status = ["New", "Ready", "Invalid", "Completed"]
             obj.Status = "New"
 
-    def onDocumentRestored(self):
+    def onDocumentRestored(self, obj=None):
+        if obj is not None:
+            self.Object = obj
+        self.Analysis = analysis_for_case(self.Object)
+        if self.Analysis is None:
+            self.Analysis = getattr(self.Object, "Analysis", None)
+        if self.Analysis is not None:
+            if "Analysis" in self.Object.PropertiesList:
+                self.Object.Analysis = None
+            if (
+                "CTformCase" in self.Analysis.PropertiesList
+                and getattr(self.Analysis, "CTformCase", None) is self.Object
+            ):
+                self.Analysis.CTformCase = None
         self._add_properties()
 
 
@@ -106,14 +154,8 @@ def make_case(doc, name="CTformCase"):
 
     case = doc.addObject("App::FeaturePython", name)
     case.Label = "CTform Case Settings"
-    case.addProperty("App::PropertyLink", "Analysis", "CTform")
-    case.Analysis = analysis
     case.Proxy = CTformCase(case, analysis)
     analysis.addObject(case)
-
-    if "CTformCase" not in analysis.PropertiesList:
-        analysis.addProperty("App::PropertyLink", "CTformCase", "CTform")
-    analysis.CTformCase = case
     return case
 
 
@@ -131,7 +173,9 @@ def make_solver(doc, case=None, name="CTformSolver"):
     if case is None:
         raise ValueError("Create a CTform case before creating its solver")
 
-    analysis = case.Analysis
+    analysis = analysis_for_case(case)
+    if analysis is None:
+        raise ValueError("The CTform case is not a child of a FEM analysis")
     solver = doc.addObject("Fem::FemSolverObjectPython", name)
     solver.Label = "CTform Solver"
     solver.addProperty("App::PropertyLink", "Case", "CTform")
@@ -143,10 +187,21 @@ def make_solver(doc, case=None, name="CTformSolver"):
     solver.CaseDirectory = case.CaseDirectory
     analysis.addObject(solver)
 
-    if "Solver" not in case.PropertiesList:
-        case.addProperty("App::PropertyLink", "Solver", "CTform")
-    case.Solver = solver
     return solver
+
+
+def analysis_for_case(case):
+    """Return the FEM analysis that owns the CTform case settings object."""
+    for parent in getattr(case, "InList", ()) or ():
+        if (
+            getattr(parent, "TypeId", "") == "Fem::FemAnalysis"
+            and case in (getattr(parent, "Group", ()) or ())
+        ):
+            return parent
+    legacy_analysis = getattr(case, "Analysis", None)
+    if getattr(legacy_analysis, "TypeId", "") == "Fem::FemAnalysis":
+        return legacy_analysis
+    return None
 
 
 def find_case(doc):
