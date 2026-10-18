@@ -97,9 +97,11 @@ export adapter; it does not validate a CTform Core solve.
     - Pass: it becomes a child of Step 1 and the target exports as the face's
       physical-group ID/name from the assigned Gmsh mesh.
 13. Optionally create a native FEM **Force** condition on the upper tool by
-    clicking **Add** and selecting the tool. Attach it to Step 2.
+    clicking **Add**, selecting the tool, and choosing its axial FEM Y direction.
+    Attach it to Step 2.
     - Pass: it exports as force-controlled tool motion. Workpiece Force is not
-      supported by Core and must not be attached.
+      supported by Core and must not be attached. FEM Y maps to CTform axial Z;
+      radial FEM X direction is not supported by the force-control workflow.
 14. Select Step 1 and run **Clone Load Step**.
     - Pass: the clone has a unique step ID, copies the source schedule and
       active state, and contains distinct copies of Step 1's conditions that

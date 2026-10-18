@@ -758,7 +758,9 @@ def _displacement_components(condition: object) -> list[tuple[str, float]]:
 
 def _force_components(condition: object) -> list[tuple[str, float]]:
     force = _first_numeric_value(condition, ("Force", "Value"), 0.0, "N")
-    direction = getattr(condition, "Direction", None)
+    direction = getattr(condition, "DirectionVector", None)
+    if direction is None:
+        direction = getattr(condition, "Direction", None)
     if direction is not None and all(hasattr(direction, axis.lower()) for axis in "XYZ"):
         values = {"X": float(direction.x), "Y": float(direction.y), "Z": float(direction.z)}
         norm = sum(value * value for value in values.values()) ** 0.5

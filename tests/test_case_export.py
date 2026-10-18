@@ -613,7 +613,8 @@ class CaseExportTests(unittest.TestCase):
             Label="Punch force",
             References=[(tool_profile, ["Edge1"])],
             Force=500.0,
-            Direction=SimpleNamespace(x=0.0, y=1.0, z=0.0),
+            Direction=(tool_profile, ["Edge1"]),
+            DirectionVector=SimpleNamespace(x=0.0, y=1.0, z=0.0),
             Active=True,
         )
         tool = SimpleNamespace(
@@ -637,6 +638,38 @@ class CaseExportTests(unittest.TestCase):
 
         self.assertEqual(exported["tools"][0]["forceTarget"], 500.0)
         self.assertEqual(exported["tools"][0]["motion"]["axis"], "Z")
+
+    def test_radial_native_tool_force_is_not_mapped_to_axial_control(self):
+        tool_profile = SimpleNamespace()
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintForce",
+            Proxy=None,
+            Label="Radial punch force",
+            References=[(tool_profile, ["Edge1"])],
+            Force=500.0,
+            Direction=(tool_profile, ["Edge1"]),
+            DirectionVector=SimpleNamespace(x=1.0, y=0.0, z=0.0),
+            Active=True,
+        )
+        tool = SimpleNamespace(
+            Shape=tool_profile,
+            ToolId="tool-punch-id",
+            ToolName="Punch",
+            Label="CTform Tool: Punch",
+        )
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Press",
+            StartTime=0.0,
+            EndTime=1.0,
+            Increments=10,
+            MechanicalBCs=[condition],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+
+        with self.assertRaisesRegex(ValueError, "requires an axial FEM force"):
+            loadsteps_to_dict(SimpleNamespace(LoadSteps=[step], Tools=[tool]))
 
     def test_native_tool_temperature_condition_is_rejected(self):
         tool_profile = SimpleNamespace()

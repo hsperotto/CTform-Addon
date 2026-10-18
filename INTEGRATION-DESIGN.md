@@ -216,7 +216,7 @@ The supported forging mapping is deliberately narrower than the full FEM catalog
 | --- | --- |
 | Fixed constraint | Native FEM condition; export as a fixed workpiece-region condition or zero-motion state on a named tool. |
 | Displacement constraint | Native FEM condition; export as a Workpiece displacement or, on a named Tool folder, as per-step tool velocity. |
-| Force constraint | Native FEM condition; supported only on a named Tool folder, where it selects CTform force control. |
+| Force constraint | Native FEM condition; supported only on a named Tool folder as axial CTform force control. FEM Y maps to CTform Z; radial FEM X force is not supported by the current force servo. |
 | Temperature constraint | Native FEM condition; export as a workpiece thermal condition or tool temperature state. |
 | Heat-flux constraint | Native FEM condition; export as a workpiece thermal condition. |
 | Body heat source | Native FEM condition; export as CTform heat generation on the workpiece. |
