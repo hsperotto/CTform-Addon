@@ -106,7 +106,7 @@ Implemented modules:
 
 Selected FEM commands exposed in CTform:
 
-- `CTform_CreateWorkpieceMesh` (configures a Workpiece mesh as explicit 2D, first order)
+- `FEM_MeshGmshFromShape` (the smoke-test workflow sets first-order elements)
 - `FEM_MeshRegion`
 - `FEM_MeshGroup`
 - `FEM_MeshDisplayInfo`

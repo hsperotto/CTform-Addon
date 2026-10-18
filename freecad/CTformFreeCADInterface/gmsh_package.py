@@ -42,7 +42,7 @@ def export_gmsh_mesh(mesh_object: object, output_path: str | Path) -> dict[str, 
     if str(getattr(mesh_object, "ElementOrder", "1st")) not in _SUPPORTED_ELEMENT_ORDERS:
         raise ValueError(
             "CTform v2 currently supports first-order Tri3/Quad4 Gmsh meshes only. "
-            "Use Configure Workpiece Gmsh Mesh or set ElementOrder to '1st' and regenerate."
+            "Use Mesh From Shape by Gmsh, set ElementOrder to '1st', and regenerate."
         )
 
     from femmesh.gmshtools import GmshTools

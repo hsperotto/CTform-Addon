@@ -40,7 +40,7 @@ class GmshPackageTests(unittest.TestCase):
     def test_second_order_mesh_error_points_to_ctform_mesher(self):
         mesh = SimpleNamespace(ElementDimension="2D", ElementOrder="2nd")
         with TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(ValueError, "Configure Workpiece Gmsh Mesh"):
+            with self.assertRaisesRegex(ValueError, "ElementOrder to '1st'"):
                 export_gmsh_mesh(mesh, Path(directory) / "workpiece.msh")
 
     def test_physical_group_tags_are_deterministic(self):
