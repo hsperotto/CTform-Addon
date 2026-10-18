@@ -88,7 +88,7 @@ def ensure_material_library(doc, analysis, case):
     return library
 
 
-def materials_in_case(case) -> list[object]:
+def materials_in_case(case) -> list[Any]:
     library = getattr(case, "MaterialLibrary", None)
     return [
         material
@@ -226,13 +226,13 @@ def _apply_material_record(material, record: dict[str, Any]) -> None:
         if key in thermal:
             _set_imported_value(material, property_name, thermal[key], unit)
 
-    for table_name, property_name in (
-        ("youngModulusTable", "YoungModulusTableJSON"),
-        ("conductivityTable", "ConductivityTableJSON"),
-        ("specificHeatTable", "SpecificHeatTableJSON"),
-        ("flowStressTable", "FlowStressTableJSON"),
+    for source, table_name, property_name in (
+        (elastic, "youngModulusTable", "YoungModulusTableJSON"),
+        (thermal, "conductivityTable", "ConductivityTableJSON"),
+        (thermal, "specificHeatTable", "SpecificHeatTableJSON"),
+        (record, "flowStressTable", "FlowStressTableJSON"),
     ):
-        value = record.get(table_name)
+        value = source.get(table_name)
         if value is not None:
             setattr(material, property_name, json.dumps(value))
 

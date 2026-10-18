@@ -69,13 +69,20 @@ class MaterialLibraryTests(unittest.TestCase):
                         "model": "HenselSpittel",
                         "parameters": {"A": 1.2e9, "m1": 0.1, "m2": 0.2, "m3": 0.3, "m4": 0.4},
                     },
-                    "elastic": {"youngModulus": 2.1e11, "poissonRatio": 0.3},
+                    "elastic": {
+                        "youngModulus": 2.1e11,
+                        "poissonRatio": 0.3,
+                        "youngModulusTable": [{"temperature": 293.15, "value": 2.1e11}],
+                    },
                     "thermal": {
                         "density": 7800.0,
                         "thermalExpansionCoefficient": 1.2e-5,
                         "thermalConductivity": 30.0,
                         "specificHeat": 460.0,
+                        "conductivityTable": [{"temperature": 293.15, "value": 30.0}],
+                        "specificHeatTable": [{"temperature": 293.15, "value": 460.0}],
                     },
+                    "flowStressTable": [{"temperature": 1000.0, "strainRate": 1.0, "strain": 0.1, "stress": 1.0e8}],
                 }
             ]
         }
@@ -99,6 +106,10 @@ class MaterialLibraryTests(unittest.TestCase):
         self.assertEqual(material.MaterialId, "aisi-h13-tool-steel")
         self.assertEqual(material.Model, "HenselSpittel")
         self.assertEqual(material.HenselSpittelA, 1.2e9)
+        self.assertNotEqual(material.YoungModulusTableJSON, "[]")
+        self.assertNotEqual(material.ConductivityTableJSON, "[]")
+        self.assertNotEqual(material.SpecificHeatTableJSON, "[]")
+        self.assertNotEqual(material.FlowStressTableJSON, "[]")
         self.assertEqual(len(materials_to_dict(self.case)["materials"]), 1)
 
     def test_importing_the_same_catalog_twice_does_not_duplicate_material(self):

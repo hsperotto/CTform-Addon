@@ -44,15 +44,18 @@ export adapter; it does not validate a CTform Core solve.
    - Pass: the analysis tree contains one Workpiece folder and two separately
      named Tool folders, each linked to its source shape.
 6. Select the Workpiece folder and run **Assign CTform Material**. Choose
-   **Import materials.json...** and select a catalog with complete material
-   records; choose `ForgingSteel` for the Workpiece. Repeat on `UpperPunch` and
-   choose `ToolSteel`, then assign that same catalog entry to `LowerDie`.
+  **Import materials.json...** and select the demo catalog beside the sample
+  case package. Choose `Hot Forging Steel Demo` for the Workpiece. Repeat on
+  `UpperPunch` and choose `H13 Tool Steel Demo`, then assign that same catalog
+  entry to `LowerDie`.
    - Pass: the analysis tree has one shared **CTform Materials** folder;
      Workpiece, `UpperPunch`, and `LowerDie` link to their chosen material
      objects. Each used material appears once in `materials.json` with a
      readable stable ID.
    - **Create CTform Material** is the manual fallback when no imported catalog
      entry is suitable; fill its physical properties before export.
+   - The supplied demo values are illustrative smoke-test data, not a validated
+     constitutive calibration for production simulations.
 7. Select the source face inside the Workpiece folder and run native **Mesh From
    Shape by Gmsh**. In the task panel, set `ElementOrder` to `1st` before
    generating; leave `ElementDimension` at `From Shape` for a Face or set it to
