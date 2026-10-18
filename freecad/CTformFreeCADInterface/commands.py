@@ -38,7 +38,7 @@ class CreateCaseCommand:
         return {
             "Pixmap": _ICON,
             "MenuText": "Create CTform Case",
-            "ToolTip": "Create a CTform 2D case",
+            "ToolTip": "Create a dimension-neutral CTform case",
         }
 
     def IsActive(self):
