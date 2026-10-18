@@ -32,8 +32,8 @@ _ICON_DIR = os.path.join(os.path.dirname(__file__), "resources", "icons")
 _ICON_CASE = "FEM_Analysis"
 _ICON_SOLVER = "FEM_SolverControl"
 _ICON_CREATE_MATERIAL = "FEM_MaterialSolid"
-_ICON_ASSIGN_MATERIAL = "FEM_MaterialEditor"
-_ICON_MESH = "FEM_MeshGmshFromShape"
+_ICON_ASSIGN_MATERIAL = os.path.join(_ICON_DIR, "assign-material.svg")
+_ICON_ASSIGN_MESH = os.path.join(_ICON_DIR, "assign-gmesh.svg")
 _ICON_EXPORT = "Std_Export"
 _ICON_CONTACT_PAIR = "FEM_ConstraintContact"
 _ICON_WORKPIECE = os.path.join(_ICON_DIR, "workpiece.svg")
@@ -250,7 +250,7 @@ class AssignMeshCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON_MESH,
+            "Pixmap": _ICON_ASSIGN_MESH,
             "MenuText": "Assign FEM Mesh to CTform Component",
             "ToolTip": "Link a Gmsh FEM mesh to the selected Workpiece or Tool folder",
         }
