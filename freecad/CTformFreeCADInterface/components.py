@@ -71,7 +71,7 @@ def make_workpiece(doc, analysis, case, shape, name="CTformWorkpiece"):
     obj = doc.addObject("App::DocumentObjectGroupPython", name)
     obj.Proxy = CTformWorkpiece(obj)
     obj.Shape = shape
-    obj.Label = f'CTform Workpiece: "{shape.Label}"'
+    obj.Label = f'CTform Workpiece: {shape.Label}'
     analysis.addObject(obj)
     obj.addObject(shape)
     case.Workpiece = obj
