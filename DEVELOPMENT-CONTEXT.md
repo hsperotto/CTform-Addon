@@ -34,9 +34,10 @@ This file is a handoff note for resuming development.
    load-step scheduling, Solver settings, case export, and Core execution.
    Native FEM conditions remain the source of truth; tool motion is mapped from
    native FEM conditions during export.
-8. The FEM analysis contains expandable Workpiece, Tool, and Load Step folders.
-   The Workpiece owns contact pairs; each component links its shape, mesh, and
-   material. Tools have explicit names and stable IDs.
+8. The FEM analysis contains expandable Workpiece, Tool, CTform Materials, and
+   Load Step folders. The Workpiece owns contact pairs; each component links its
+   shape, mesh, and one shared catalog material. Tools have explicit names and
+   readable stable IDs.
 9. Modeling dimension, formulation, contact numerics, thermal/run/output
    settings, ALE, and remeshing belong to the CTform Solver object. The Case
    remains component- and dimension-neutral.
@@ -50,7 +51,7 @@ This file is a handoff note for resuming development.
 Create CTform Case
 -> Create geometry with Part/Sketcher/Draft/FEM tools
 -> Create Workpiece and named Tool folders from selected shapes
--> Create/assign CTform materials inside component folders
+-> Choose/import shared CTform materials and link them from components
 -> Create/refine a 2D Gmsh mesh
 -> Assign the FEM/Gmsh mesh to its component folder
 -> Create visible Workpiece-to-Tool contact pairs
@@ -86,8 +87,9 @@ Implemented modules:
 - `commands.py`: creates cases, solvers, components, and CTform materials;
    assigns materials and FEM meshes; creates contact pairs/load steps; attaches and
   detaches native FEM conditions; clones steps; exports cases.
-- `materials.py`: CTform-owned material records with stable IDs, named
-   constitutive parameters, unit-aware scalar properties, and table fields.
+- `materials.py`: shared case-level CTform material catalog, readable stable
+   IDs, JSON import, named constitutive parameters, unit-aware properties, and
+   material snapshot export.
 - `contacts.py`: visible workpiece-to-tool contact pairs and v2 serialization.
 - `gmsh_package.py`: uses FreeCAD FEM `GmshTools` to save the same Gmsh run as
    native MSH2 for Core and refresh the visible FEM mesh from UNV; no custom mesh

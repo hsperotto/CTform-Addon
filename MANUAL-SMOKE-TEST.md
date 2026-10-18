@@ -43,12 +43,16 @@ export adapter; it does not validate a CTform Core solve.
    lower faces and run **Create Tool**, naming them `UpperPunch` and `LowerDie`.
    - Pass: the analysis tree contains one Workpiece folder and two separately
      named Tool folders, each linked to its source shape.
-6. Select the Workpiece folder and run **Create CTform Material**. Create
-   `ForgingSteel` with `HenselSpittel`; create `ToolSteel` on `UpperPunch`, then
-   select `LowerDie` and the existing ToolSteel object and run **Assign CTform
-   Material**.
-   - Pass: each component has a material link; both materials have stable IDs
-     and appear once each in `materials.json`.
+6. Select the Workpiece folder and run **Assign CTform Material**. Choose
+   **Import materials.json...** and select a catalog with complete material
+   records; choose `ForgingSteel` for the Workpiece. Repeat on `UpperPunch` and
+   choose `ToolSteel`, then assign that same catalog entry to `LowerDie`.
+   - Pass: the analysis tree has one shared **CTform Materials** folder;
+     Workpiece, `UpperPunch`, and `LowerDie` link to their chosen material
+     objects. Each used material appears once in `materials.json` with a
+     readable stable ID.
+   - **Create CTform Material** is the manual fallback when no imported catalog
+     entry is suitable; fill its physical properties before export.
 7. Select the source face inside the Workpiece folder and run native **Mesh From
    Shape by Gmsh**. In the task panel, set `ElementOrder` to `1st` before
    generating; leave `ElementDimension` at `From Shape` for a Face or set it to

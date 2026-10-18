@@ -52,9 +52,10 @@ The initial model should follow FEM's established object organization:
 | FreeCAD concept | CTform object |
 | --- | --- |
 | FEM Analysis container | Dimension-neutral case tree |
-| Workpiece folder | Shape, mesh, material, and contact-pair links |
-| Tool folder | Shape, mesh, material, stable identity, and geometry settings |
-| Material object | CTform material definition linked from a component folder |
+| Workpiece folder | Shape/mesh links, shared material reference, and owned contact pairs |
+| Tool folder | Shape/mesh links, shared material reference, stable identity, and geometry settings |
+| Materials folder | One case-level object per CTform material, reusable across components |
+| Material object | CTform constitutive and intrinsic thermal data |
 | FEM/Gmsh mesh object | Mesh linked from its Workpiece or Tool folder |
 | Constraint-like object | CTform process or boundary condition |
 | Solver object | Modeling dimension, formulation, numerical/run/output configuration |
@@ -65,11 +66,12 @@ pretending to be a generic FEM solver. Native FEM objects may be referenced or
 adapted when that preserves compatibility with existing FreeCAD workflows.
 
 The CTform case is a dimension-neutral orchestration object. It links one
-Workpiece folder, named Tool folders, and Load Step folders. Component folders
-directly link their native shape, mesh, and material objects; contact pairs are
-owned by the Workpiece and each links that Workpiece plus a Tool. The Solver
-owns modeling dimension/type, formulation, contact numerics, thermal/run/output,
-ALE, and remeshing settings. No second mechanical-part model is introduced.
+Workpiece folder, named Tool folders, a shared Materials folder, and Load Step
+folders. Each material object exists once in the case catalog; component folders
+link to it alongside their native shape and mesh. Contact pairs are owned by
+the Workpiece and each links a Tool. The Solver owns modeling dimension/type,
+formulation, contact numerics, thermal/run/output, ALE, and remeshing settings.
+No second mechanical-part model is introduced.
 
 ## `case.json` as the canonical case model
 
@@ -344,7 +346,7 @@ Create CTform Case
   -> Create Solver and select dimension/modeling type
   -> Create Workpiece and Tool Profiles
   -> Create Workpiece-to-Tool Contact Pairs
-  -> Add Materials to Component Folders
+  -> Choose/import from the shared Materials catalog
   -> Generate 2D Gmsh Mesh
   -> Define Load Steps and Simulation Fields
   -> Validate and Save Case

@@ -3,7 +3,7 @@
 
 """CTform workpiece and tool component folders."""
 
-import uuid
+from .identifiers import readable_id
 
 
 class CTformWorkpiece:
@@ -53,7 +53,7 @@ class CTformTool:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "ToolId", "App::PropertyString", "Identity", uuid.uuid4().hex)
+        _add(obj, "ToolId", "App::PropertyString", "Identity", "")
         _add(obj, "ToolName", "App::PropertyString", "Identity", "Tool")
         _add(obj, "Shape", "App::PropertyLink", "Component", None)
         _add(obj, "Mesh", "App::PropertyLink", "Component", None)
@@ -95,6 +95,11 @@ def make_tool(
     obj.Proxy = CTformTool(obj)
     obj.Shape = shape
     obj.ToolName = tool_name
+    obj.ToolId = readable_id(
+        tool_name,
+        (getattr(existing, "ToolId", "") for existing in (getattr(case, "Tools", ()) or ())),
+        fallback="tool",
+    )
     obj.Label = f"CTform Tool: {tool_name}"
     analysis.addObject(obj)
     obj.addObject(shape)

@@ -49,6 +49,8 @@ class CTformCase:
             obj.addProperty("App::PropertyLink", "Workpiece", "Components")
         if "Tools" not in obj.PropertiesList:
             obj.addProperty("App::PropertyLinkList", "Tools", "Components")
+        if "MaterialLibrary" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyLink", "MaterialLibrary", "Components")
         if "LoadSteps" not in obj.PropertiesList:
             obj.addProperty("App::PropertyLinkList", "LoadSteps", "CTform")
         if "Status" not in obj.PropertiesList:
@@ -165,6 +167,9 @@ def make_case(doc, name="CTformCase"):
     case.Label = "CTform Case Settings"
     case.Proxy = CTformCase(case, analysis)
     analysis.addObject(case)
+    from .materials import ensure_material_library
+
+    ensure_material_library(doc, analysis, case)
     return case
 
 

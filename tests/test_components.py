@@ -82,10 +82,21 @@ class ComponentFolderTests(unittest.TestCase):
         self.assertIs(tool.Shape, shape)
         self.assertIn(shape, tool.Group)
         self.assertEqual(tool.ToolName, "UpperPunch")
-        self.assertTrue(tool.ToolId)
+        self.assertEqual(tool.ToolId, "upper-punch")
         self.assertEqual(tool.Label, "CTform Tool: UpperPunch")
         self.assertEqual(self.case.Tools, [tool])
         self.assertIn(tool, self.analysis.Group)
+
+    def test_tool_ids_are_readable_and_unique_for_duplicate_names(self):
+        first = make_tool(
+            self.doc, self.analysis, self.case, SimpleNamespace(Label="Punch body"), "Punch"
+        )
+        second = make_tool(
+            self.doc, self.analysis, self.case, SimpleNamespace(Label="Punch copy"), "Punch"
+        )
+
+        self.assertEqual(first.ToolId, "punch")
+        self.assertEqual(second.ToolId, "punch-2")
 
     def test_model_and_execution_settings_belong_to_solver_not_case(self):
         case_obj = FakeObject("CTformCase")
@@ -115,8 +126,12 @@ class ComponentFolderTests(unittest.TestCase):
         pair = make_contact_pair(self.doc, self.case.Workpiece, tool)
 
         self.assertIs(pair.Tool, tool)
+        self.assertEqual(pair.PairId, "workpiece-to-punch")
         self.assertIn(pair, self.case.Workpiece.ContactPairs)
         self.assertIn(pair, self.case.Workpiece.Group)
+
+        second_pair = make_contact_pair(self.doc, self.case.Workpiece, tool)
+        self.assertEqual(second_pair.PairId, "workpiece-to-punch-2")
 
 
 if __name__ == "__main__":

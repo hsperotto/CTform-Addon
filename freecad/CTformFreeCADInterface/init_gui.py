@@ -76,15 +76,16 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 		self.appendMenu(
 			["CTform", "Materials"],
 			[
-				"CTform_CreateMaterial",
 				"CTform_AssignMaterial",
+				"CTform_AssignMaterial",
+				"CTform_CreateMaterial",
 			],
 		)
 		self.appendToolbar(
 			"CTform Materials",
 			[
-				"CTform_CreateMaterial",
 				"CTform_AssignMaterial",
+				"CTform_CreateMaterial",
 			],
 		)
 		self.appendMenu(

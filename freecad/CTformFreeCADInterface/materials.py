@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import json
-import uuid
+from pathlib import Path
 from typing import Any
+
+from .identifiers import readable_id
 
 
 MATERIAL_MODELS = (
@@ -35,7 +37,7 @@ class CTformMaterial:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "MaterialId", "App::PropertyString", "Identity", uuid.uuid4().hex)
+        _add(obj, "MaterialId", "App::PropertyString", "Identity", "")
         _add(obj, "MaterialName", "App::PropertyString", "Identity", "New CTform Material")
         _add(obj, "Model", "App::PropertyEnumeration", "Constitutive", list(MATERIAL_MODELS))
         _add(obj, "HenselSpittelA", "App::PropertyPressure", "Hensel-Spittel", 0.0)
@@ -74,21 +76,181 @@ class CTformMaterial:
         self._add_properties()
 
 
-def make_material(doc, analysis, component=None, name="CTformMaterial"):
-    """Create a CTform material and place it in its Workpiece or Tool folder."""
-    obj = doc.addObject("App::FeaturePython", name)
+def ensure_material_library(doc, analysis, case):
+    """Return the single case-owned CTform material catalog folder."""
+    library = getattr(case, "MaterialLibrary", None)
+    if library is not None:
+        return library
+    library = doc.addObject("App::DocumentObjectGroup", "CTformMaterials")
+    library.Label = "CTform Materials"
+    analysis.addObject(library)
+    case.MaterialLibrary = library
+    return library
+
+
+def materials_in_case(case) -> list[object]:
+    library = getattr(case, "MaterialLibrary", None)
+    return [
+        material
+        for material in (getattr(library, "Group", ()) or ())
+        if type(getattr(material, "Proxy", None)).__name__ == "CTformMaterial"
+    ]
+
+
+def make_material(
+    doc,
+    analysis,
+    case,
+    material_name="New CTform Material",
+    component=None,
+    record: dict[str, Any] | None = None,
+):
+    """Create one shared case material, optionally importing a complete record."""
+    library = ensure_material_library(doc, analysis, case)
+    material_name = str(material_name).strip() or "New CTform Material"
+    existing = materials_in_case(case)
+    material_id = readable_id(
+        material_name,
+        (getattr(material, "MaterialId", "") for material in existing),
+        fallback="material",
+    )
+    obj = doc.addObject("App::FeaturePython", "CTformMaterial")
     obj.Proxy = CTformMaterial(obj)
-    obj.Label = "CTform Material"
-    if component is None:
-        analysis.addObject(obj)
-    else:
-        component.addObject(obj)
+    obj.MaterialName = material_name
+    obj.MaterialId = material_id
+    obj.Label = f"CTform Material: {material_name}"
+    library.addObject(obj)
+    if record is not None:
+        _apply_material_record(obj, record)
+    if component is not None:
         component.Material = obj
     return obj
 
 
+def import_material_catalog(doc, analysis, case, path: str | Path) -> list[object]:
+    """Import complete material records from a CTform materials.json catalog."""
+    source = Path(path)
+    data = json.loads(source.read_text(encoding="utf-8"))
+    records = data.get("materials") if isinstance(data, dict) else None
+    if not isinstance(records, list) or not records:
+        raise ValueError("Select a CTform materials.json file with a non-empty materials list")
+
+    validated_records = []
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError("Each imported material must be a JSON object")
+        name = str(record.get("name", "")).strip()
+        if not name or not all(section in record for section in ("constitutive", "elastic", "thermal")):
+            raise ValueError("Each imported material needs a name, constitutive, elastic, and thermal data")
+        if not all(isinstance(record[section], dict) for section in ("constitutive", "elastic", "thermal")):
+            raise ValueError(f"Material {name!r} has malformed constitutive, elastic, or thermal data")
+        model = record["constitutive"].get("model")
+        if model not in MATERIAL_MODELS:
+            raise ValueError(f"Unsupported CTform material model in imported catalog: {model}")
+        issues = material_readiness_issues({"materials": [record]})
+        if issues:
+            raise ValueError("Imported material is incomplete: " + " ".join(issues))
+        validated_records.append(record)
+
+    existing = materials_in_case(case)
+    imported = []
+    for record in validated_records:
+        name = str(record["name"]).strip()
+        source_record = dict(record)
+        source_record.pop("id", None)
+        duplicate = next(
+            (
+                material
+                for material in existing
+                if _record_without_id(material_to_dict(material)) == source_record
+            ),
+            None,
+        )
+        if duplicate is not None:
+            imported.append(duplicate)
+            continue
+        material = make_material(doc, analysis, case, name, record=record)
+        existing.append(material)
+        imported.append(material)
+    return imported
+
+
+def _record_without_id(record: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "id"}
+
+
+def _apply_material_record(material, record: dict[str, Any]) -> None:
+    constitutive = record["constitutive"]
+    model = str(constitutive["model"])
+    if model not in MATERIAL_MODELS:
+        raise ValueError(f"Unsupported CTform material model in imported catalog: {model}")
+    material.Model = model
+    parameters = constitutive.get("parameters", {})
+    parameter_fields = {
+        "HenselSpittel": {
+            "A": ("HenselSpittelA", "Pa"),
+            "m1": ("HenselSpittelM1", None),
+            "m2": ("HenselSpittelM2", None),
+            "m3": ("HenselSpittelM3", None),
+            "m4": ("HenselSpittelM4", None),
+        },
+        "Hollomon": {
+            "K": ("HollomonK", "Pa"),
+            "n": ("HollomonN", None),
+            "eps0": ("HollomonEps0", None),
+            "mRate": ("HollomonRateExponent", None),
+        },
+        "NortonHoffViscoplastic": {
+            "K": ("NortonHoffK", "Pa"),
+            "m": ("NortonHoffM", None),
+        },
+        "ElastoPlasticIsotropic": {
+            "yieldStress": ("YieldStress", "Pa"),
+            "hardeningModulus": ("HardeningModulus", "Pa"),
+        },
+    }
+    for key, (property_name, unit) in parameter_fields.get(model, {}).items():
+        if key in parameters:
+            _set_imported_value(material, property_name, parameters[key], unit)
+
+    elastic = record["elastic"]
+    _set_imported_value(material, "YoungModulus", elastic.get("youngModulus", 0.0), "Pa")
+    material.PoissonRatio = float(elastic.get("poissonRatio", 0.3))
+    thermal = record["thermal"]
+    for key, property_name, unit in (
+        ("density", "Density", "kg/m^3"),
+        ("thermalExpansionCoefficient", "ThermalExpansionCoefficient", "1/K"),
+        ("thermalConductivity", "ThermalConductivity", "W/m/K"),
+        ("specificHeat", "SpecificHeat", "J/kg/K"),
+    ):
+        if key in thermal:
+            _set_imported_value(material, property_name, thermal[key], unit)
+
+    for table_name, property_name in (
+        ("youngModulusTable", "YoungModulusTableJSON"),
+        ("conductivityTable", "ConductivityTableJSON"),
+        ("specificHeatTable", "SpecificHeatTableJSON"),
+        ("flowStressTable", "FlowStressTableJSON"),
+    ):
+        value = record.get(table_name)
+        if value is not None:
+            setattr(material, property_name, json.dumps(value))
+
+
+def _set_imported_value(material, property_name: str, value, unit: str | None) -> None:
+    if unit is None:
+        setattr(material, property_name, float(value))
+        return
+    try:
+        import FreeCAD as App
+    except ImportError:
+        setattr(material, property_name, float(value))
+        return
+    setattr(material, property_name, App.Units.Quantity(f"{float(value)} {unit}"))
+
+
 def materials_to_dict(case: object) -> dict[str, Any]:
-    """Serialize materials linked directly from the Workpiece and Tool folders."""
+    """Serialize unique materials referenced by the Workpiece and Tool folders."""
     components = [getattr(case, "Workpiece", None)]
     components.extend(getattr(case, "Tools", ()) or ())
     materials = []

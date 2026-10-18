@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import uuid
+from .identifiers import readable_id
 
 
 class CTformContactPair:
@@ -23,7 +23,7 @@ class CTformContactPair:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "PairId", "App::PropertyString", "Identity", uuid.uuid4().hex)
+        _add(obj, "PairId", "App::PropertyString", "Identity", "")
         _add(obj, "PairName", "App::PropertyString", "Contact", "Workpiece Tool Contact")
         _add(obj, "Tool", "App::PropertyLink", "Contact", None)
         _add(obj, "SlavePhysicalGroup", "App::PropertyString", "Contact", "All")
@@ -56,6 +56,11 @@ def make_contact_pair(doc, workpiece, tool):
     obj.Tool = tool
     tool_name = getattr(tool, "ToolName", "") or tool.Label
     obj.PairName = f"Workpiece to {tool_name}"
+    obj.PairId = readable_id(
+        obj.PairName,
+        (getattr(pair, "PairId", "") for pair in (getattr(workpiece, "ContactPairs", ()) or ())),
+        fallback="contact",
+    )
     obj.Label = obj.PairName
     workpiece.addObject(obj)
     pairs = list(getattr(workpiece, "ContactPairs", ()) or ())

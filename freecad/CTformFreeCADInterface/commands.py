@@ -25,7 +25,7 @@ from .loadsteps import (
     make_load_step,
     condition_targets_tool,
 )
-from .materials import make_material
+from .materials import import_material_catalog, make_material, materials_in_case
 
 
 _ICON_DIR = os.path.join(os.path.dirname(__file__), "resources", "icons")
@@ -107,10 +107,22 @@ class CreateMaterialCommand:
         if component is None:
             return
         case = find_case(component.Document)
-        material = make_material(
-            component.Document, analysis_for_case(case), component=component
+        material_name, accepted = QtWidgets.QInputDialog.getText(
+            Gui.getMainWindow(),
+            "Create CTform Material",
+            "Material name:",
+            text="New CTform Material",
         )
-        App.ActiveDocument.recompute()
+        if not accepted or not material_name.strip():
+            return
+        material = make_material(
+            component.Document,
+            analysis_for_case(case),
+            case,
+            material_name.strip(),
+            component=component,
+        )
+        component.Document.recompute()
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(material)
 
@@ -149,34 +161,61 @@ def _selected_component():
     return component
 
 
-def _selected_component_and_material():
-    selection = Gui.Selection.getSelection()
-    if len(selection) != 2:
-        return None, None
-    component = next((obj for obj in selection if _is_component(obj)), None)
-    material = next(
-        (
-            obj
-            for obj in selection
-            if type(getattr(obj, "Proxy", None)).__name__ == "CTformMaterial"
-        ),
-        None,
-    )
-    if component is None or material is None or component.Document is not material.Document:
-        return None, None
+def _choose_material_for_component(component):
     case = find_case(component.Document)
     analysis = analysis_for_case(case)
-    material_is_owned = any(
-        material in (getattr(owner, "Group", ()) or ())
-        for owner in _case_components(case)
-    )
-    if (
-        not _component_in_case(component, case)
-        or not material_is_owned
-        and material not in (getattr(analysis, "Group", ()) or ())
-    ):
-        return None, None
-    return component, material
+    while True:
+        materials = materials_in_case(case)
+        choice_to_material = {
+            f"{material.MaterialName} [{material.MaterialId}]": material
+            for material in materials
+        }
+        import_option = "Import materials.json..."
+        create_option = "Create a new material..."
+        choices = list(choice_to_material) + [import_option, create_option]
+        selection, accepted = QtWidgets.QInputDialog.getItem(
+            Gui.getMainWindow(),
+            "Assign CTform Material",
+            f"Material for {component.Label}:",
+            choices,
+            0,
+            False,
+        )
+        if not accepted:
+            return None
+        if selection == import_option:
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                Gui.getMainWindow(),
+                "Import CTform Material Catalog",
+                "",
+                "CTform material catalog (materials.json)",
+            )
+            if not path:
+                return None
+            try:
+                import_material_catalog(component.Document, analysis, case, path)
+            except (OSError, ValueError, json.JSONDecodeError) as error:
+                QtWidgets.QMessageBox.warning(
+                    Gui.getMainWindow(), "Import CTform Materials", str(error)
+                )
+                return None
+            continue
+        if selection == create_option:
+            material_name, accepted = QtWidgets.QInputDialog.getText(
+                Gui.getMainWindow(),
+                "Create CTform Material",
+                "Material name:",
+                text="New CTform Material",
+            )
+            if not accepted or not material_name.strip():
+                return None
+            return make_material(
+                component.Document,
+                analysis,
+                case,
+                material_name.strip(),
+            )
+        return choice_to_material.get(selection)
 
 
 class AssignMaterialCommand:
@@ -190,25 +229,17 @@ class AssignMaterialCommand:
         }
 
     def IsActive(self):
-        component, material = _selected_component_and_material()
-        return component is not None and material is not None
+        return _selected_component() is not None
 
     def Activated(self):
-        component, material = _selected_component_and_material()
-        if component is None or material is None:
+        component = _selected_component()
+        if component is None:
+            return
+        material = _choose_material_for_component(component)
+        if material is None:
             return
         doc = component.Document
         doc.openTransaction("Assign CTform material")
-        case = find_case(doc)
-        analysis = analysis_for_case(case)
-        if material in (getattr(analysis, "Group", ()) or ()):
-            analysis.removeObject(material)
-            component.addObject(material)
-        elif not any(
-            material in (getattr(owner, "Group", ()) or ())
-            for owner in _case_components(case)
-        ):
-            component.addObject(material)
         component.Material = material
         doc.recompute()
         doc.commitTransaction()
