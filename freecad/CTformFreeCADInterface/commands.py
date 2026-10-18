@@ -32,7 +32,7 @@ _ICON = os.path.join(os.path.dirname(__file__), "resources", "icons", "logo.svg"
 
 
 class CreateCaseCommand:
-    """Create an empty CTform 2D case."""
+    """Create an empty CTform case."""
 
     def GetResources(self):
         return {
@@ -42,7 +42,7 @@ class CreateCaseCommand:
         }
 
     def IsActive(self):
-        return App.ActiveDocument is not None
+        return App.ActiveDocument is not None and find_case(App.ActiveDocument) is None
 
     def Activated(self):
         case = make_case(App.ActiveDocument)

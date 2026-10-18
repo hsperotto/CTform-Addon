@@ -106,8 +106,6 @@ Implemented modules:
 
 Selected FEM commands exposed in CTform:
 
-- `FEM_MaterialEditor`
-- `FEM_MaterialSolid`
 - `FEM_MeshGmshFromShape`
 - `FEM_MeshRegion`
 - `FEM_MeshGroup`

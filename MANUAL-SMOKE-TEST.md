@@ -49,8 +49,6 @@ export adapter; it does not validate a CTform Core solve.
    Material**.
    - Pass: each component has a material link; both materials have stable IDs
      and appear once each in `materials.json`.
-   - Native FEM Solid Material may still be created as a reference/preset, but it
-     is not the CTform constitutive material.
 7. Select the workpiece face and run **Mesh From Shape by Gmsh**. Use the task
    panel to generate a mesh.
    - Pass: a non-empty FEM mesh is created for the workpiece face, and the mesh

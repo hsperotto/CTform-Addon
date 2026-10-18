@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from freecad.CTformFreeCADInterface.analysis import CTformCase, CTformSolver
+from freecad.CTformFreeCADInterface.analysis import CTformCase, CTformSolver, make_case
 from freecad.CTformFreeCADInterface.components import make_tool, make_workpiece
 from freecad.CTformFreeCADInterface.contacts import make_contact_pair
 
@@ -12,6 +12,7 @@ class FakeObject:
         self.Label = name
         self.PropertiesList = []
         self.Group = []
+        self.InList = []
 
     def addProperty(self, property_type, name, group):
         self.PropertiesList.append(name)
@@ -27,14 +28,23 @@ class FakeObject:
 
     def addObject(self, obj):
         self.Group.append(obj)
+        if hasattr(obj, "InList"):
+            obj.InList.append(self)
 
     def setEditorMode(self, name, mode):
         pass
 
 
 class FakeDocument:
+    def __init__(self):
+        self.Objects = []
+
     def addObject(self, object_type, name):
-        return FakeObject(name)
+        obj = FakeObject(name)
+        obj.TypeId = object_type
+        obj.Document = self
+        self.Objects.append(obj)
+        return obj
 
 
 class ComponentFolderTests(unittest.TestCase):
@@ -51,13 +61,19 @@ class ComponentFolderTests(unittest.TestCase):
 
         self.assertIs(workpiece.Shape, shape)
         self.assertIn(shape, workpiece.Group)
-        self.assertEqual(workpiece.Label, 'CTform Workpiece: "Blank"')
+        self.assertEqual(workpiece.Label, "CTform Workpiece: Blank")
         self.assertIs(self.case.Workpiece, workpiece)
         self.assertIn(workpiece, self.analysis.Group)
         self.assertEqual(workpiece.ContactPairs, [])
 
         with self.assertRaisesRegex(ValueError, "only one workpiece"):
             make_workpiece(self.doc, self.analysis, self.case, shape)
+
+    def test_document_rejects_a_second_ctform_case(self):
+        make_case(self.doc)
+
+        with self.assertRaisesRegex(ValueError, "only one CTform case"):
+            make_case(self.doc)
 
     def test_tool_folder_links_shape_and_is_registered_on_case(self):
         shape = SimpleNamespace(Label="PunchBody")

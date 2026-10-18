@@ -156,6 +156,8 @@ class CTformSolver:
 
 def make_case(doc, name="CTformCase"):
     """Create a native FEM analysis with a CTform case child object."""
+    if find_case(doc) is not None:
+        raise ValueError("A document can contain only one CTform case")
     analysis = doc.addObject("Fem::FemAnalysis", "CTformAnalysis")
     analysis.Label = "CTform Case"
 

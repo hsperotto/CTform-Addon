@@ -19,7 +19,7 @@ These are the agreed direction for addon work and future Core changes. Do not re
 1. **Materials are a case-scoped catalog.** New packages use `materials.json`, containing named material records with stable IDs. Workpiece, tools, and future regions refer to those IDs from `case.json`.
 2. **Material properties belong to materials.** Constitutive models/curves, elasticity, density, conductivity, specific heat, and other intrinsic thermomechanical data belong in material records, not `thermal.json`.
 3. **Thermal files describe process state and conditions.** Initial temperatures, ambient/environment conditions, thermal boundary conditions, plastic/friction heat settings, and thermal-contact controls belong in `thermal.json` or the appropriate load step. Initial temperature is state, not an intrinsic material property.
-4. **CTform material data is authoritative.** Native FEM/standard materials can seed or display compatible scalar properties, but cannot replace CTform constitutive data. Export a deterministic snapshot; do not depend on a live mutable global FreeCAD library at solve time.
+4. **CTform material data is authoritative.** Only CTform material objects are authored and assigned in this workflow. Native FEM/standard material commands are not exposed; export a deterministic snapshot and do not depend on a live mutable global FreeCAD library at solve time.
 5. **Legacy material files remain readable during migration.** Existing singular `material.json` inputs normalize to a one-entry default catalog. New addon work targets the catalog contract.
 6. **Keep the files readable.** Prefer one case-local `materials.json` over one file per geometry object or a remote database. Use named fields, explicit units, simple references, and concise metadata.
 7. **FreeCAD FEM/Gmsh mesh is authoritative for the initial solve mesh.** Core imports that mesh and its physical groups; later Core remeshing is allowed only if it preserves stable group identity and provenance.
@@ -273,7 +273,7 @@ Relevant Core sources to inspect when changing these contracts:
 4. **Flow-curve representation:** Choose regular tensor grid or a set of curves indexed by temperature and strain rate. Define interpolation, extrapolation, sparse slices, duplicate points, valid ranges, and required derivatives before implementation.
 5. **Tool material requirements:** Decide whether every rigid tool must reference a material or whether a named, explicit default is permitted. Never silently use the workpiece material.
 6. **Region assignment:** Decide how multiple materials in one workpiece mesh map to stable physical groups and how those IDs survive remesh/restart.
-7. **Material conflict behavior:** If a FEM material seeds a CTform material, define one-way import/snapshot or explicit override precedence. Never maintain two equally authoritative editable values.
+7. **Material conflict behavior:** No native FEM material seeding is supported. CTform material objects are the single editable source for exported constitutive and intrinsic thermal properties.
 8. **Tool merge:** Core currently builds tool definitions from `geometry.tools` and per-step `tools`. Merge per-step state with geometry identity by stable ID/name; reject conflicting duplicate identities.
 9. **Geometry targets:** Current Core target strings include `All`, top/bottom aliases, and Z selectors; unknown strings currently fall back to all nodes. New packages need stable physical-group IDs and must reject unknown IDs rather than broaden the target.
 

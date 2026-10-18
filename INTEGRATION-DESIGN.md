@@ -19,7 +19,7 @@ It may expose selected functionality from existing FreeCAD workbenches:
 - Part, Sketcher, and Draft geometry preparation commands.
 - Selected Part Design geometry commands where they are useful for planar model
   preparation.
-- FEM material creation and editing tools.
+- CTform-owned material creation and assignment tools.
 - FEM/Gmsh 2D mesh creation and refinement tools.
 - CTform-specific analysis, validation, execution, and result commands.
 
@@ -253,11 +253,11 @@ regions reference catalog entries by stable `materialId` in `case.json`.
 `thermal.json` contains case/process thermal state and conditions, not intrinsic
 material properties such as conductivity or heat capacity.
 
-Native FEM materials may seed or display compatible scalar properties, but the
-CTform material record is authoritative for simulation. CTform constitutive laws
-and temperature-dependent flow data must not be hidden in generic FEM fields.
-Export a deterministic snapshot with the case package so runs do not depend on a
-mutable global FreeCAD material library.
+CTform material objects are the only material authoring and assignment path in
+the workbench. Native FEM material editor commands are not exposed; CTform
+constitutive laws and temperature-dependent flow data stay in CTform material
+records. Export a deterministic snapshot so runs do not depend on a mutable
+global FreeCAD material library.
 
 The first demo may use one workpiece material and a shared tool material, but the
 catalog and assignments must support distinct materials per eligible region.

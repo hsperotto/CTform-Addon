@@ -62,8 +62,6 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			[
 				"CTform_CreateMaterial",
 				"CTform_AssignMaterial",
-				"FEM_MaterialEditor",
-				"FEM_MaterialSolid",
 			],
 		)
 		self.appendToolbar(
@@ -71,8 +69,6 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			[
 				"CTform_CreateMaterial",
 				"CTform_AssignMaterial",
-				"FEM_MaterialEditor",
-				"FEM_MaterialSolid",
 			],
 		)
 		self.appendMenu(
