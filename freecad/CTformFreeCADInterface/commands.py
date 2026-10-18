@@ -28,7 +28,20 @@ from .loadsteps import (
 from .materials import make_material
 
 
-_ICON = os.path.join(os.path.dirname(__file__), "resources", "icons", "logo.svg")
+_ICON_DIR = os.path.join(os.path.dirname(__file__), "resources", "icons")
+_ICON_CASE = "FEM_Analysis"
+_ICON_SOLVER = "FEM_SolverControl"
+_ICON_CREATE_MATERIAL = "FEM_MaterialSolid"
+_ICON_ASSIGN_MATERIAL = "FEM_MaterialEditor"
+_ICON_MESH = "FEM_MeshGmshFromShape"
+_ICON_EXPORT = "Std_Export"
+_ICON_CONTACT_PAIR = os.path.join(_ICON_DIR, "contact-pair.svg")
+_ICON_WORKPIECE = os.path.join(_ICON_DIR, "workpiece.svg")
+_ICON_TOOL = os.path.join(_ICON_DIR, "tool.svg")
+_ICON_LOAD_STEP = os.path.join(_ICON_DIR, "load-step.svg")
+_ICON_CLONE_STEP = os.path.join(_ICON_DIR, "clone-step.svg")
+_ICON_ATTACH_CONDITION = os.path.join(_ICON_DIR, "attach-condition.svg")
+_ICON_DETACH_CONDITION = os.path.join(_ICON_DIR, "detach-condition.svg")
 
 
 class CreateCaseCommand:
@@ -36,7 +49,7 @@ class CreateCaseCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_CASE,
             "MenuText": "Create CTform Case",
             "ToolTip": "Create a dimension-neutral CTform case",
         }
@@ -59,7 +72,7 @@ class CreateSolverCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_SOLVER,
             "MenuText": "Create CTform Solver",
             "ToolTip": "Create a CTform Core solver job",
         }
@@ -81,7 +94,7 @@ class CreateMaterialCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_CREATE_MATERIAL,
             "MenuText": "Create CTform Material",
             "ToolTip": "Create a CTform material with constitutive and thermal properties",
         }
@@ -171,7 +184,7 @@ class AssignMaterialCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_ASSIGN_MATERIAL,
             "MenuText": "Assign CTform Material",
             "ToolTip": "Assign a selected CTform material to a Workpiece or Tool folder",
         }
@@ -237,7 +250,7 @@ class AssignMeshCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_MESH,
             "MenuText": "Assign FEM Mesh to CTform Component",
             "ToolTip": "Link a Gmsh FEM mesh to the selected Workpiece or Tool folder",
         }
@@ -293,7 +306,7 @@ class CreateContactPairCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_CONTACT_PAIR,
             "MenuText": "Create CTform Contact Pair",
             "ToolTip": "Create a contact pair from a selected workpiece and named tool",
         }
@@ -320,7 +333,7 @@ class ExportCaseCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_EXPORT,
             "MenuText": "Export CTform Case",
             "ToolTip": "Write the CTform case.json package",
         }
@@ -369,7 +382,7 @@ class CreateWorkpieceCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_WORKPIECE,
             "MenuText": "Create Workpiece",
             "ToolTip": "Create a CTform Workpiece folder from the selected shape",
         }
@@ -400,7 +413,7 @@ class CreateToolCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_TOOL,
             "MenuText": "Create Tool",
             "ToolTip": "Create a named CTform Tool folder from the selected shape",
         }
@@ -444,7 +457,7 @@ class CreateLoadStepCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_LOAD_STEP,
             "MenuText": "Create Load Step",
             "ToolTip": "Create a CTform load step",
         }
@@ -465,7 +478,7 @@ class CloneLoadStepCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_CLONE_STEP,
             "MenuText": "Clone Load Step",
             "ToolTip": "Duplicate the selected load step and its conditions",
         }
@@ -529,7 +542,7 @@ class AttachConditionToStepCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_ATTACH_CONDITION,
             "MenuText": "Attach Selected Condition to Load Step",
             "ToolTip": "Add a selected native FEM condition to a CTform load-step folder",
         }
@@ -556,7 +569,7 @@ class DetachConditionFromStepCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": _ICON,
+            "Pixmap": _ICON_DETACH_CONDITION,
             "MenuText": "Detach Condition from Load Step",
             "ToolTip": "Move the selected condition to the analysis root",
         }
