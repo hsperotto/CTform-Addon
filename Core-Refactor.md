@@ -149,8 +149,17 @@ integers.
 
 - `case.json`: case identity, simulation type/formulation, geometry/tool identity and material references, mesh references, contact setup, run/output settings, sidecar references.
 - `materials.json`: CTform constitutive model and parameters or measured flow curves; elastic properties; density; conductivity, heat capacity, expansion, and other intrinsic material data.
-- `thermal.json`: initial temperatures; ambient conditions and thermal BCs; thermal plastic/friction efficiencies; contact heat-transfer/process controls.
-- `loadsteps.json`: time window/increments; step-local mechanical/thermal BCs; per-step tool motion and thermal state.
+- `thermal.json`: default and native FEM initial-temperature conditions; ambient conditions and thermal BCs; thermal plastic/friction efficiencies; contact heat-transfer/process controls.
+- `loadsteps.json`: time window/increments; step-local mechanical/thermal BCs and initial-temperature conditions; per-step tool motion and thermal state.
+
+Native FEM `ConstraintInitialTemperature` is an initial-state condition, distinct
+from `ConstraintTemperature`, which remains a thermal boundary condition. Case
+conditions are written once in `thermal.json`; step-owned initial conditions are
+written under that step in `loadsteps.json`.
+Role-level temperatures provide defaults; an explicit condition overrides its
+selected physical-group target, or a named tool by stable `toolId`. A step-owned
+condition initializes that target at the start of that step and does not hold it
+at the specified temperature afterward.
 
 Tool temperature/motion can vary by process step; tool identity and its intrinsic material reference do not. Do not copy material data into every step.
 

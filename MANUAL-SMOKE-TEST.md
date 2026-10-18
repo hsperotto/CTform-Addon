@@ -87,6 +87,15 @@ export adapter; it does not validate a CTform Core solve.
       physical-group ID/name from the assigned Gmsh mesh.
       Do not use this as a substitute for initial temperature unless that
       time-dependent Dirichlet condition is intended.
+    - Separately create native FEM **Initial Temperature** conditions: leave one
+      at the analysis root and attach another to Step 1.
+    - Pass: the root condition appears in `thermal.json` under
+      `initialTemperatureConditions` with `scope: global`; the step condition
+      appears in Step 1's `initialTemperatureConditions` with `scope: step`.
+      Neither appears in `thermalBCs`; selected geometry resolves to the same
+      Gmsh physical-group IDs as other native FEM conditions.
+      A condition selected on a named tool targets its stable `toolId`, not a
+      workpiece physical group.
 13. Create a native FEM **Body Heat Source** condition. Click **Add** and select
     the whole workpiece face; attach it to Step 2.
     - Pass: it becomes a child of Step 2 and exports as `HeatGeneration` over the
@@ -180,8 +189,9 @@ export adapter; it does not validate a CTform Core solve.
   step makes the step its document-group parent and defines when it applies.
 - Dragging a condition into a step and using **Attach Selected Condition to Load
   Step** must produce identical group membership and exported JSON.
-- Native conditions left at the analysis root are global and export into every
-  step. Detaching from a step returns the condition to that root.
+- Root mechanical/thermal boundary conditions are global; root initial-temperature
+  conditions are exported once as case initial state. Detaching from a step
+  returns the condition to the analysis root.
 - **Clone Load Step** creates new child condition objects; generic FreeCAD
   copy/paste is not the supported cloning path because it does not register the
   clone in CTform's step list or assign a fresh step ID.
@@ -191,11 +201,9 @@ export adapter; it does not validate a CTform Core solve.
 - Tool displacement and force conditions are translated to CTform per-step tool
   data; the old CTform custom condition and tool-motion creation commands should
   not reappear in the workflow.
-- Initial temperature is not removed from CTform Core. Core accepts global
-  workpiece/tool initial temperatures in `thermal.json` and per-step tool
-  temperature state in `loadsteps.json`. FEM Initial Temperature is not a
-  per-step boundary condition; native FEM initial-temperature export remains a
-  separate integration item.
+- Native FEM Initial Temperature exports as separate case- or step-scoped
+  initial-state data, not as a persistent thermal boundary condition. The
+  existing role-level workpiece/tool defaults remain available in `thermal.json`.
 - Core's thermal BC schema includes `ambientTemperature` for convection/radiation.
   It also consumes film coefficient and emissivity. Ambient heat exchange is
   therefore modeled in Core through convection/radiation thermal BC data, not as

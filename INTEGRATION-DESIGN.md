@@ -220,7 +220,7 @@ The supported forging mapping is deliberately narrower than the full FEM catalog
 | Body heat source | Native FEM condition; export as CTform heat generation on the workpiece. |
 | Pressure constraint | Not exposed yet. Core needs a pressure traction implementation; treating pressure as displacement or a point force would be incorrect. Forging contact already computes interface pressure. |
 | FEM contact/tie and other solver-specific constraints | Not exposed. CTform owns its contact-pair model, and these FEM constraints do not map to its rigid-profile contact contract. |
-| Initial temperature | Not a per-step boundary condition. Add after the case-level thermal input supports geometry-role mapping. |
+| FEM Initial Temperature | Native initial-state condition; serialize at case scope in `thermal.json` or step scope in `loadsteps.json`, never as a persistent thermal BC. |
 
 Native FEM condition subelements resolve to physical groups from the assigned
 FreeCAD/Gmsh mesh. The exporter writes the group ID and name alongside the same

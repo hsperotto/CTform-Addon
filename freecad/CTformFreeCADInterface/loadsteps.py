@@ -27,6 +27,7 @@ class CTformLoadStep:
         _add(obj, "Active", "App::PropertyBool", "Load Step", True)
         _add(obj, "MechanicalBCs", "App::PropertyLinkList", "Conditions", [])
         _add(obj, "ThermalBCs", "App::PropertyLinkList", "Conditions", [])
+        _add(obj, "InitialTemperatureConditions", "App::PropertyLinkList", "Conditions", [])
         _add(obj, "ToolMotions", "App::PropertyLinkList", "Conditions", [])
 
     def onDocumentRestored(self, obj=None):
@@ -44,7 +45,12 @@ class CTformLoadStep:
         obj = self.Object
         existing = list(getattr(obj, "Group", ()) or ())
         legacy = []
-        for property_name in ("MechanicalBCs", "ThermalBCs", "ToolMotions"):
+        for property_name in (
+            "MechanicalBCs",
+            "ThermalBCs",
+            "InitialTemperatureConditions",
+            "ToolMotions",
+        ):
             legacy.extend(getattr(obj, property_name, ()) or ())
         for condition in legacy:
             if condition not in existing:
@@ -119,7 +125,12 @@ def clone_load_step(doc, analysis, source_step):
     children = list(getattr(source_step, "Group", ()) or ())
     children.extend(
         condition
-        for property_name in ("MechanicalBCs", "ThermalBCs", "ToolMotions")
+        for property_name in (
+            "MechanicalBCs",
+            "ThermalBCs",
+            "InitialTemperatureConditions",
+            "ToolMotions",
+        )
         for condition in (getattr(source_step, property_name, ()) or ())
         if condition not in children
     )
@@ -211,7 +222,9 @@ def fem_condition_kind(condition):
         return "heat_generation"
     if "constraintheatflux" in type_name:
         return "heat_flux"
-    if "constrainttemperature" in type_name and "initial" not in type_name:
+    if "constraintinitialtemperature" in type_name:
+        return "initial_temperature"
+    if "constrainttemperature" in type_name:
         return "temperature"
     if "ctformmechanicalbc" in type_name:
         return str(getattr(condition, "Type", "Fixed")).lower()
@@ -224,6 +237,8 @@ def fem_condition_kind(condition):
 def fem_condition_category(condition):
     """Return the CTform load-step category for a supported FEM condition."""
     kind = fem_condition_kind(condition)
+    if kind == "initial_temperature":
+        return "initial_temperature"
     if kind in ("temperature", "heat_flux", "heat_generation"):
         return "thermal"
     if kind in ("fixed", "displacement", "force"):
@@ -292,6 +307,7 @@ def _sync_condition_links(step):
     try:
         mechanical = []
         thermal = []
+        initial_temperatures = []
         tool_motions = []
         for child in getattr(step, "Group", ()) or ():
             category = fem_condition_category(child)
@@ -299,6 +315,8 @@ def _sync_condition_links(step):
                 mechanical.append(child)
             elif category == "thermal":
                 thermal.append(child)
+            elif category == "initial_temperature":
+                initial_temperatures.append(child)
             elif (
                 getattr(child, "Proxy", None) is not None
                 and "ctformtoolmotion" in type(child.Proxy).__name__.lower()
@@ -306,6 +324,7 @@ def _sync_condition_links(step):
                 tool_motions.append(child)
         step.MechanicalBCs = mechanical
         step.ThermalBCs = thermal
+        step.InitialTemperatureConditions = initial_temperatures
         step.ToolMotions = tool_motions
     finally:
         if proxy is not None:

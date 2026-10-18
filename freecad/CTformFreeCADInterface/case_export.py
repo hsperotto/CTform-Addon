@@ -221,6 +221,7 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
 def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
     """Write process thermal state; intrinsic material properties live in materials.json."""
     thermal_bcs = []
+    initial_temperature_conditions = []
     for index, condition in enumerate(_root_conditions(case, "thermal")):
         if _condition_tool_name(condition, case):
             continue
@@ -228,11 +229,18 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
             _condition_to_dict(condition, index + 1, thermal=True,
                                physical_groups=physical_groups, scope="global")
         )
+    for index, condition in enumerate(_root_conditions(case, "initial_temperature")):
+        initial_temperature_conditions.extend(
+            _initial_temperature_condition_to_dict(
+                condition, index + 1, physical_groups, "global", case
+            )
+        )
     return {
         "initialTemperature": {
             "workpiece": _temperature_to_si(_value(case, "WorkpieceInitialTemperature", 293.15)),
             "tools": _temperature_to_si(_value(case, "ToolInitialTemperature", 293.15)),
         },
+        "initialTemperatureConditions": initial_temperature_conditions,
         "thermalPlasticEfficiency": _value(case, "ThermalPlasticEfficiency", 0.9),
         "thermalFrictionEfficiency": _value(case, "ThermalFrictionEfficiency", 0.0),
         "frictionHeatPartitionToWorkpiece": _value(
@@ -256,9 +264,13 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         thermal_bcs = []
         local_mechanical = _step_conditions(step, "mechanical", "MechanicalBCs")
         local_thermal = _step_conditions(step, "thermal", "ThermalBCs")
+        local_initial_temperatures = _step_conditions(
+            step, "initial_temperature", "InitialTemperatureConditions"
+        )
         step_name = getattr(step, "StepName", "LoadStep")
         local_mechanical_records = []
         local_thermal_records = []
+        initial_temperature_conditions = []
         tools = [
             {
                 "id": getattr(motion, "MotionId", 1000 + index),
@@ -376,6 +388,12 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
                         scope="step",
                     )
                 )
+        for index, condition in enumerate(local_initial_temperatures):
+            initial_temperature_conditions.extend(
+                _initial_temperature_condition_to_dict(
+                    condition, index + 1, physical_groups, "step", case
+                )
+            )
         warnings.extend(_condition_override_warnings(
             root_mechanical, local_mechanical, case, step_name, False, physical_groups
         ))
@@ -397,6 +415,7 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
                 "increments": getattr(step, "Increments", 1),
                 "mechanicalBCs": mechanical_bcs,
                 "thermalBCs": thermal_bcs,
+                "initialTemperatureConditions": initial_temperature_conditions,
                 "tools": tools,
             }
         )
@@ -644,6 +663,47 @@ def _condition_to_dict(
             record.update(target)
             output.append(record)
     return output
+
+
+def _initial_temperature_condition_to_dict(
+    condition: object,
+    identifier: int,
+    physical_groups=None,
+    scope: str | None = None,
+    case: object | None = None,
+) -> list[dict[str, Any]]:
+    if getattr(condition, "EnableFinalTemperature", False):
+        raise ValueError(
+            "CTform initial-temperature conditions currently support a constant initial temperature only"
+        )
+    temperature = _first_numeric_value(
+        condition,
+        ("initialTemperature", "InitialTemperature", "Temperature", "Value"),
+        293.15,
+        "K",
+    )
+    base_id = getattr(condition, "Id", identifier)
+    name = getattr(condition, "Label", "InitialTemperature")
+    active = getattr(condition, "Active", not getattr(condition, "Suppressed", False))
+    tool_data = _condition_tool_data(condition, case) if case is not None else None
+    targets = (
+        [{"target": "tool", "toolId": tool_data["id"], "toolName": tool_data["name"]}]
+        if tool_data
+        else _condition_target_data(condition, physical_groups)
+    )
+    records = []
+    for target_index, target in enumerate(targets):
+        record = {
+            "id": base_id + target_index,
+            "name": name,
+            "temperature": temperature,
+            "active": active,
+        }
+        if scope is not None:
+            record["scope"] = scope
+        record.update(target)
+        records.append(record)
+    return records
 
 
 def _condition_type_name(condition: object) -> str:

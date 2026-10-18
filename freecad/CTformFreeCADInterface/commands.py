@@ -447,7 +447,13 @@ def _selected_condition_and_step():
     is_tool_condition = condition_targets_role(condition, case, "tool")
     if kind == "force" and not is_tool_condition:
         return None, None
-    if is_tool_condition and kind not in ("fixed", "displacement", "force", "temperature"):
+    if is_tool_condition and kind not in (
+        "fixed",
+        "displacement",
+        "force",
+        "temperature",
+        "initial_temperature",
+    ):
         return None, None
     return condition, step
 

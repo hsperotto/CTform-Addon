@@ -76,7 +76,12 @@ def make_role_assignment(
     if role == "tool" and not obj.ToolId:
         obj.ToolId = uuid.uuid4().hex
     obj.Target = target
-    obj.Label = f"CTform Tool: {tool_name}" if role == "tool" and tool_name else f"CTform Role: {role}"
+    if role == "tool" and tool_name:
+        obj.Label = f"CTform Tool: {tool_name}"
+    elif role == "workpiece" and target is not None:
+        obj.Label = f'CTform Workpiece: "{target.Label}"'
+    else:
+        obj.Label = f"CTform Role: {role}"
     analysis.addObject(obj)
     case = next(
         (
