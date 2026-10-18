@@ -281,6 +281,46 @@ class AssignMeshCommand:
         Gui.Selection.addSelection(component)
 
 
+class CreateWorkpieceMeshCommand:
+    """Create or configure a first-order 2D Gmsh mesh for the Workpiece."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "FEM_MeshGmshFromShape",
+            "MenuText": "Configure Workpiece Gmsh Mesh",
+            "ToolTip": "Create a CTform-compatible first-order 2D mesh for the selected Workpiece",
+        }
+
+    def IsActive(self):
+        component = _selected_component()
+        if not isinstance(getattr(component, "Proxy", None), CTformWorkpiece):
+            return False
+        mesh = getattr(component, "Mesh", None)
+        return mesh is None or "FemMeshGmsh" in str(getattr(mesh, "TypeId", ""))
+
+    def Activated(self):
+        workpiece = _selected_component()
+        if not isinstance(getattr(workpiece, "Proxy", None), CTformWorkpiece):
+            return
+        doc = workpiece.Document
+        doc.openTransaction("Configure CTform Workpiece Gmsh Mesh")
+        mesh = getattr(workpiece, "Mesh", None)
+        if mesh is None:
+            import ObjectsFem
+
+            mesh = ObjectsFem.makeMeshGmsh(doc, "FEMMeshGmsh")
+            workpiece.Mesh = mesh
+            workpiece.addObject(mesh)
+        mesh.Shape = workpiece.Shape
+        mesh.ElementDimension = "2D"
+        mesh.ElementOrder = "1st"
+        doc.recompute()
+        doc.commitTransaction()
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(mesh)
+        Gui.ActiveDocument.setEdit(mesh.Name)
+
+
 def _selected_workpiece_and_tool():
     selection = Gui.Selection.getSelection()
     if len(selection) != 2:
@@ -596,6 +636,7 @@ Gui.addCommand("CTform_CreateSolver", CreateSolverCommand())
 Gui.addCommand("CTform_CreateMaterial", CreateMaterialCommand())
 Gui.addCommand("CTform_AssignMaterial", AssignMaterialCommand())
 Gui.addCommand("CTform_AssignMesh", AssignMeshCommand())
+Gui.addCommand("CTform_CreateWorkpieceMesh", CreateWorkpieceMeshCommand())
 Gui.addCommand("CTform_CreateContactPair", CreateContactPairCommand())
 Gui.addCommand("CTform_ExportCase", ExportCaseCommand())
 Gui.addCommand("CTform_CreateWorkpiece", CreateWorkpieceCommand())

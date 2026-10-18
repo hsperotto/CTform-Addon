@@ -9,6 +9,7 @@ import unittest
 from freecad.CTformFreeCADInterface.gmsh_package import (
     _pin_physical_group_ids,
     _is_supported_mesh_dimension,
+    export_gmsh_mesh,
     read_msh2_physical_names,
 )
 
@@ -35,6 +36,12 @@ class GmshPackageTests(unittest.TestCase):
         self.assertFalse(_is_supported_mesh_dimension(mesh))
         mesh.ElementDimension = "2D"
         self.assertTrue(_is_supported_mesh_dimension(mesh))
+
+    def test_second_order_mesh_error_points_to_ctform_mesher(self):
+        mesh = SimpleNamespace(ElementDimension="2D", ElementOrder="2nd")
+        with TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "Configure Workpiece Gmsh Mesh"):
+                export_gmsh_mesh(mesh, Path(directory) / "workpiece.msh")
 
     def test_physical_group_tags_are_deterministic(self):
         geo = '\n'.join(

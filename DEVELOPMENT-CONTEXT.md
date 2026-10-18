@@ -106,7 +106,7 @@ Implemented modules:
 
 Selected FEM commands exposed in CTform:
 
-- `FEM_MeshGmshFromShape`
+- `CTform_CreateWorkpieceMesh` (configures a Workpiece mesh as explicit 2D, first order)
 - `FEM_MeshRegion`
 - `FEM_MeshGroup`
 - `FEM_MeshDisplayInfo`

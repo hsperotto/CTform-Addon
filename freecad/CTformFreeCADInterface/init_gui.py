@@ -54,7 +54,7 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			[
 				"Sketcher_NewSketch",
 				"Part_MakeFace",
-				"FEM_MeshGmshFromShape",
+				"CTform_CreateWorkpieceMesh",
 				"CTform_AssignMesh",
 				"FEM_MeshRegion",
 				"FEM_MeshGroup",
@@ -67,7 +67,7 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			[
 				"Sketcher_NewSketch",
 				"Part_MakeFace",
-				"FEM_MeshGmshFromShape",
+				"CTform_CreateWorkpieceMesh",
 				"CTform_AssignMesh",
 				"FEM_MeshRegion",
 				"FEM_MeshGroup",
