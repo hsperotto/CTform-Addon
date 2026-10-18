@@ -14,6 +14,17 @@ from pathlib import Path
 _SUPPORTED_ELEMENT_ORDERS = {"1st"}
 
 
+def _is_supported_mesh_dimension(mesh_object: object) -> bool:
+    dimension = str(getattr(mesh_object, "ElementDimension", ""))
+    if dimension == "2D":
+        return True
+    if dimension != "From Shape":
+        return False
+    shape_link = getattr(mesh_object, "Shape", None)
+    shape = getattr(shape_link, "Shape", shape_link)
+    return str(getattr(shape, "ShapeType", "")) in ("Face", "Shell")
+
+
 def export_gmsh_mesh(mesh_object: object, output_path: str | Path) -> dict[str, object]:
     """Run the assigned FEM Gmsh object and save its mesh as native Gmsh MSH2.
 
@@ -23,8 +34,11 @@ def export_gmsh_mesh(mesh_object: object, output_path: str | Path) -> dict[str, 
     """
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
-    if str(getattr(mesh_object, "ElementDimension", "")) != "2D":
-        raise ValueError("CTform v2 requires a 2D FreeCAD FEM/Gmsh mesh")
+    if not _is_supported_mesh_dimension(mesh_object):
+        raise ValueError(
+            "CTform v2 requires a 2D FreeCAD FEM/Gmsh mesh; set ElementDimension "
+            "to 2D or use From Shape with a Face/Shell geometry"
+        )
     if str(getattr(mesh_object, "ElementOrder", "1st")) not in _SUPPORTED_ELEMENT_ORDERS:
         raise ValueError("CTform v2 currently supports first-order Tri3/Quad4 Gmsh meshes only")
 
