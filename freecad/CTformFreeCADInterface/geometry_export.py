@@ -1,32 +1,35 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # SPDX-FileNotice: Part of the CTform FreeCAD Interface addon.
 
-"""Export role geometry as Core-readable ASCII DXF snapshots."""
+"""Export Workpiece and Tool geometry as Core-readable ASCII DXF snapshots."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from .components import CTformTool, CTformWorkpiece
 
-def export_role_geometry(role_assignment: object, output_path: str | Path) -> dict[str, object]:
-    """Export the assigned planar profile as ASCII DXF scaled to SI meters."""
+
+def export_component_geometry(component: object, output_path: str | Path) -> dict[str, object]:
+    """Export a component's planar profile as ASCII DXF in SI meters."""
     import FreeCAD as App
     import Part
 
-    target = getattr(role_assignment, "Target", None)
+    target = getattr(component, "Shape", None)
     shape = getattr(target, "Shape", None)
     if target is None or shape is None or shape.isNull():
-        raise ValueError(f"Role {getattr(role_assignment, 'Label', 'geometry')!r} has no exportable Shape")
+        raise ValueError(f"Component {getattr(component, 'Label', 'geometry')!r} has no exportable Shape")
     if getattr(shape, "Solids", ()):
         raise ValueError("CTform 2D geometry export accepts profiles/faces, not solids")
     edges = tuple(getattr(shape, "Edges", ()) or ())
     if not edges:
-        raise ValueError(f"Role {getattr(role_assignment, 'Label', 'geometry')!r} has no profile edges")
+        raise ValueError(f"Component {getattr(component, 'Label', 'geometry')!r} has no profile edges")
 
-    role = str(getattr(role_assignment, "Role", ""))
-    if role not in ("workpiece", "tool"):
-        raise ValueError(f"Unsupported CTform geometry role: {role}")
-    tool_layer = _validate_layer_name(getattr(role_assignment, "ToolLayer", "") or "ToolProfile")
+    is_workpiece = isinstance(getattr(component, "Proxy", None), CTformWorkpiece)
+    is_tool = isinstance(getattr(component, "Proxy", None), CTformTool)
+    if not is_workpiece and not is_tool:
+        raise ValueError(f"Unsupported CTform geometry component: {component.Label!r}")
+    tool_layer = _validate_layer_name(getattr(component, "ToolLayer", "") or "ToolProfile")
     temporary_document = None
     created = []
     try:
@@ -43,14 +46,14 @@ def export_role_geometry(role_assignment: object, output_path: str | Path) -> di
                     f"Geometry edge Edge{index} is outside the XY plane after placement and cannot be exported as 2D DXF"
                 )
             si_edge = world_edge.transformShape(scale, True, True)
-            if role == "workpiece":
+            if is_workpiece:
                 export_obj = temporary_document.addObject("Part::Feature", f"Edge{index}")
                 export_obj.Shape = si_edge
                 created.append(export_obj)
             else:
                 scaled_edges.append(si_edge)
 
-        if role == "tool":
+        if is_tool:
             export_obj = temporary_document.addObject("Part::Feature", tool_layer)
             export_obj.Shape = Part.makeCompound(scaled_edges)
             created.append(export_obj)

@@ -30,21 +30,25 @@ export adapter; it does not validate a CTform Core solve.
 2. Run **Create CTform Case**.
    - Pass: a native FEM analysis named `CTform Case` is created and becomes the
      active FEM analysis.
+  Run **Create CTform Solver** and set `Dimension` to `2D`, `ModelingType` to
+  `axisymmetric`, and `MechanicalFormulation` to `flow`.
+  - Pass: these properties are on the Solver object, not CTform Case Settings.
 3. Use **Geometry > New Sketch** to create a Sketcher profile on the XY plane.
    Draw a closed workpiece section on positive sketch X. CTform maps sketch X to
    radial position and sketch Y to axial position.
 4. Create a planar face from the closed workpiece sketch. Create two more closed
    profiles/faces: an upper punch above the workpiece and a lower die below it.
    Keep the tool profiles separate from the workpiece.
-5. Assign the workpiece face the `workpiece` role. Assign the upper and lower
-   faces the `tool` role with the distinct names `UpperPunch` and `LowerDie`.
-   - Pass: the case contains one workpiece and two separately named tools.
-6. Run **Create CTform Material** twice. Name the materials `ForgingSteel` and
-   `ToolSteel`; choose `HenselSpittel` for the workpiece material. Assign
-   `ForgingSteel` to the workpiece role and `ToolSteel` to both tool roles using
-   **Assign CTform Material**.
-   - Pass: the role assignments link to the intended CTform materials; both
-     materials have stable IDs and appear once each in the case catalog.
+5. Select the workpiece face and run **Create Workpiece**. Select the upper and
+   lower faces and run **Create Tool**, naming them `UpperPunch` and `LowerDie`.
+   - Pass: the analysis tree contains one Workpiece folder and two separately
+     named Tool folders, each linked to its source shape.
+6. Select the Workpiece folder and run **Create CTform Material**. Create
+   `ForgingSteel` with `HenselSpittel`; create `ToolSteel` on `UpperPunch`, then
+   select `LowerDie` and the existing ToolSteel object and run **Assign CTform
+   Material**.
+   - Pass: each component has a material link; both materials have stable IDs
+     and appear once each in `materials.json`.
    - Native FEM Solid Material may still be created as a reference/preset, but it
      is not the CTform constitutive material.
 7. Select the workpiece face and run **Mesh From Shape by Gmsh**. Use the task
@@ -52,14 +56,15 @@ export adapter; it does not validate a CTform Core solve.
    - Pass: a non-empty FEM mesh is created for the workpiece face, and the mesh
      is planar with 2D elements. If FreeCAD generates a volume mesh or cannot
      mesh the face, record that as a blocker; do not proceed as if it were a
-     valid CTform 2D mesh. Select the workpiece role and mesh together and run
-     **Assign FEM Mesh to CTform Role**.
-  - Pass: the role's `Mesh` link points to this mesh object.
-8. Select the workpiece role and each tool role in turn with **Create CTform
+     valid CTform 2D mesh. Select the Workpiece folder and mesh together and run
+     **Assign FEM Mesh to CTform Component**.
+   - Pass: the Workpiece folder's `Mesh` link points to this mesh object and the
+     mesh appears under that folder in the tree.
+8. Select the Workpiece folder and each Tool folder in turn with **Create CTform
    Contact Pair** to create a visible workpiece-to-tool pair. Set distinct pair
    names and review friction/contact properties.
-   - Pass: both pairs are in the CTform case and appear in `contactInterfaces`
-     with their tool identity and workpiece target.
+   - Pass: each pair appears under the Workpiece folder, links that Workpiece
+     and its Tool, and exports in `contactInterfaces`.
 9. Create two CTform load steps. Set Step 1 time to 0-1 and Step 2 time to 1-2.
    - Pass: both values are editable. Record whether `StartTime` appears before
      `EndTime`; the property editor currently displays `EndTime` first and this
@@ -137,18 +142,19 @@ export adapter; it does not validate a CTform Core solve.
       `loadsteps.json` with their expected tool and BC data.
     - Pass: face/edge conditions reference the same physical-group IDs listed in
       `case.json.mesh.physicalGroups`.
-    - Pass: `materials.json` contains each unique material once, with roles
-      referring to it by `materialId`; `thermal.json` contains process thermal
-      state/conditions but no intrinsic conductivity or heat-capacity tables.
+    - Pass: `materials.json` contains each unique material once, with Workpiece
+      and Tool components referring to it by `materialId`; `thermal.json`
+      contains process thermal state/conditions but no intrinsic conductivity
+      or heat-capacity tables.
     - Pass: fixed `LowerDie` exports with zero velocity; `UpperPunch` exports
       with the expected axial velocity; root-global mechanical conditions carry
       `scope: global`, while local conditions carry `scope: step`.
-    - Pass: if tool source geometry has not been normalized/exported, the package
-      is clearly marked `draft` with a readiness issue; do not invoke Core.
+    - Pass: invalid or unexportable component geometry leaves the package marked
+      `draft` with a readiness issue; do not invoke Core.
 19. Save the FreeCAD document, close it, reopen it, and repeat the export.
-    - Pass: role links, step links, native condition objects, and exported values
-  remain intact after restore; tool IDs, material IDs, and contact pairs are
-  unchanged, with no proxy serialization errors or analysis/case cycle warnings.
+    - Pass: component links, step links, native condition objects, and exported
+      values remain intact after restore; tool IDs, material IDs, and contact
+      pairs are unchanged, with no proxy serialization errors or cycles.
 
 ## Scenario B: Selection and Unsupported-Input Guardrails
 
@@ -203,7 +209,7 @@ export adapter; it does not validate a CTform Core solve.
   not reappear in the workflow.
 - Native FEM Initial Temperature exports as separate case- or step-scoped
   initial-state data, not as a persistent thermal boundary condition. The
-  existing role-level workpiece/tool defaults remain available in `thermal.json`.
+  existing Workpiece/Tool default temperatures remain available in `thermal.json`.
 - Core's thermal BC schema includes `ambientTemperature` for convection/radiation.
   It also consumes film coefficient and emissivity. Ambient heat exchange is
   therefore modeled in Core through convection/radiation thermal BC data, not as
@@ -219,5 +225,5 @@ export adapter; it does not validate a CTform Core solve.
   and is exported in meters. Core must preserve physical-group names through its
   initial mesh import and later remeshing.
 - Do not run Core with the v2 package until Core supports the catalog, SI units,
-  MSH physical groups, ASCII DXF role snapshots, and local/global scopes. Full
+  MSH physical groups, ASCII DXF component snapshots, and local/global scopes. Full
   preflight and Core compatibility remain pending.

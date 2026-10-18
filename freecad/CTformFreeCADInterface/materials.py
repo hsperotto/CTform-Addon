@@ -74,26 +74,26 @@ class CTformMaterial:
         self._add_properties()
 
 
-def make_material(doc, analysis, case=None, name="CTformMaterial"):
-    """Create a CTform material object and register it in the case catalog."""
+def make_material(doc, analysis, component=None, name="CTformMaterial"):
+    """Create a CTform material and place it in its Workpiece or Tool folder."""
     obj = doc.addObject("App::FeaturePython", name)
     obj.Proxy = CTformMaterial(obj)
     obj.Label = "CTform Material"
-    analysis.addObject(obj)
-    if case is not None:
-        if "Materials" not in case.PropertiesList:
-            case.addProperty("App::PropertyLinkList", "Materials", "CTform")
-        materials = list(getattr(case, "Materials", ()) or ())
-        materials.append(obj)
-        case.Materials = materials
+    if component is None:
+        analysis.addObject(obj)
+    else:
+        component.addObject(obj)
+        component.Material = obj
     return obj
 
 
 def materials_to_dict(case: object) -> dict[str, Any]:
-    """Serialize the case's CTform material catalog using named fields and SI values."""
-    materials = list(getattr(case, "Materials", ()) or ())
-    for assignment in getattr(case, "RoleAssignments", ()) or ():
-        material = getattr(assignment, "Material", None)
+    """Serialize materials linked directly from the Workpiece and Tool folders."""
+    components = [getattr(case, "Workpiece", None)]
+    components.extend(getattr(case, "Tools", ()) or ())
+    materials = []
+    for component in components:
+        material = getattr(component, "Material", None) if component is not None else None
         if material is not None and material not in materials:
             materials.append(material)
 

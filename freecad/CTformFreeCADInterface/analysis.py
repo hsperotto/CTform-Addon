@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # SPDX-FileNotice: Part of the CTform FreeCAD Interface addon.
 
-"""FreeCAD document object for a CTform case."""
+"""Dimension-neutral CTform case and solver document objects."""
 
 
 class CTformCase:
@@ -30,101 +30,27 @@ class CTformCase:
             ("CaseDirectory", "Case", ""),
             ("CaseFile", "Case", "case.json"),
             ("MaterialsFile", "Files", "materials.json"),
-            ("MeshFile", "Files", "workpiece.msh"),
-            ("MaterialFile", "Files", "material.json"),
             ("LoadStepsFile", "Files", "loadsteps.json"),
             ("ThermalFile", "Files", "thermal.json"),
-            ("OutputDirectory", "Output", "results_case"),
-            ("ContactModel", "Contact", "node_to_segment"),
         )
         for name, group, default in string_properties:
             if name not in obj.PropertiesList:
                 obj.addProperty("App::PropertyString", name, group)
                 setattr(obj, name, default)
 
-        enum_properties = (
-            ("ModelingType", "Simulation", ["axisymmetric", "plane_strain"], "axisymmetric"),
-            ("MechanicalFormulation", "Simulation", ["flow", "displacement"], "flow"),
-        )
-        for name, group, values, default in enum_properties:
-            if name not in obj.PropertiesList:
-                obj.addProperty("App::PropertyEnumeration", name, group)
-                setattr(obj, name, values)
-                setattr(obj, name, default)
-
-        integer_properties = (
-            ("PackageSchemaVersion", "Files", 2),
-            ("VtkEvery", "Output", 1),
-        )
+        integer_properties = (("PackageSchemaVersion", "Files", 2),)
         for name, group, default in integer_properties:
             if name not in obj.PropertiesList:
                 obj.addProperty("App::PropertyInteger", name, group)
                 setattr(obj, name, default)
         obj.setEditorMode("PackageSchemaVersion", 1)
-        obj.setEditorMode("MaterialFile", 2)
 
-        thermal_float_properties = (
-            ("WorkpieceInitialTemperature", "Thermal", 293.15),
-            ("ToolInitialTemperature", "Thermal", 293.15),
-            ("ThermalPlasticEfficiency", "Thermal", 0.9),
-            ("ThermalFrictionEfficiency", "Thermal", 0.0),
-            ("FrictionHeatPartitionToWorkpiece", "Thermal", 1.0),
-            ("FrictionHeatLayerDepth", "Thermal", 0.5),
-        )
-        for name, group, default in thermal_float_properties:
-            if name not in obj.PropertiesList:
-                obj.addProperty("App::PropertyFloat", name, group)
-                setattr(obj, name, default)
-
-        if "FrictionHeatDistribution" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyEnumeration", "FrictionHeatDistribution", "Thermal")
-            obj.FrictionHeatDistribution = ["uniform", "exponential"]
-            obj.FrictionHeatDistribution = "uniform"
-
-        float_properties = (
-            ("TargetCompression", "Run", 7.0),
-            ("InitialGap", "Contact", 0.05),
-            ("PenetrationTolerance", "Contact", 1e-2),
-            ("GapTolerance", "Contact", 1e-6),
-            ("ZBottom", "Contact", 0.0),
-        )
-        for name, group, default in float_properties:
-            if name not in obj.PropertiesList:
-                obj.addProperty("App::PropertyFloat", name, group)
-                setattr(obj, name, default)
-
-        bool_properties = (
-            ("NodalCsvEnabled", "Output", False),
-            ("GeometryOnly", "Run", False),
-            ("AugmentedLagrangeEnabled", "Contact", True),
-            ("ThermalContactEnabled", "Contact", False),
-            ("ALEEnabled", "Advanced", False),
-            ("RemeshEnabled", "Advanced", False),
-        )
-        for name, group, default in bool_properties:
-            if name not in obj.PropertiesList:
-                obj.addProperty("App::PropertyBool", name, group)
-                setattr(obj, name, default)
-
-        if "RoleAssignments" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyLinkList", "RoleAssignments", "CTform")
-        if "Materials" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyLinkList", "Materials", "CTform")
-        if "ContactPairs" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyLinkList", "ContactPairs", "CTform")
+        if "Workpiece" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyLink", "Workpiece", "Components")
+        if "Tools" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyLinkList", "Tools", "Components")
         if "LoadSteps" not in obj.PropertiesList:
             obj.addProperty("App::PropertyLinkList", "LoadSteps", "CTform")
-
-        if "AnalysisType" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyString", "AnalysisType", "CTform")
-            obj.AnalysisType = "CTform 2D"
-        if "Plane" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyEnumeration", "Plane", "2D")
-            obj.Plane = ["XY"]
-            obj.Plane = "XY"
-        if "PlaneTolerance" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyFloat", "PlaneTolerance", "2D")
-            obj.PlaneTolerance = 1e-7
         if "Status" not in obj.PropertiesList:
             obj.addProperty("App::PropertyEnumeration", "Status", "CTform")
             obj.Status = ["New", "Ready", "Invalid", "Completed"]
@@ -145,6 +71,87 @@ class CTformCase:
             ):
                 self.Analysis.CTformCase = None
         self._add_properties()
+
+
+class CTformSolver:
+    """Solver-owned modeling, numerical, thermal, run, and output settings."""
+
+    def __init__(self, obj):
+        self.Object = obj
+        self._add_properties()
+
+    def dumps(self):
+        return None
+
+    def loads(self, state):
+        return None
+
+    def onDocumentRestored(self, obj=None):
+        if obj is not None:
+            self.Object = obj
+        self._add_properties()
+
+    def _add_properties(self):
+        obj = self.Object
+        enum_properties = (
+            ("Dimension", "Model", ["2D", "3D"], "2D"),
+            ("ModelingType", "Model", ["axisymmetric", "plane_strain"], "axisymmetric"),
+            ("MechanicalFormulation", "Model", ["flow", "displacement"], "flow"),
+            ("Plane", "Model", ["XY"], "XY"),
+            ("FrictionHeatDistribution", "Thermal", ["uniform", "exponential"], "uniform"),
+        )
+        for name, group, values, default in enum_properties:
+            if name not in obj.PropertiesList:
+                obj.addProperty("App::PropertyEnumeration", name, group)
+                setattr(obj, name, values)
+                setattr(obj, name, default)
+
+        string_properties = (
+            ("OutputDirectory", "Output", "results_case"),
+            ("ContactModel", "Contact", "node_to_segment"),
+            ("AnalysisType", "Model", "CTform"),
+        )
+        for name, group, default in string_properties:
+            _add(obj, name, "App::PropertyString", group, default)
+
+        float_properties = (
+            ("WorkpieceInitialTemperature", "Thermal", 293.15),
+            ("ToolInitialTemperature", "Thermal", 293.15),
+            ("ThermalPlasticEfficiency", "Thermal", 0.9),
+            ("ThermalFrictionEfficiency", "Thermal", 0.0),
+            ("FrictionHeatPartitionToWorkpiece", "Thermal", 1.0),
+            ("FrictionHeatLayerDepth", "Thermal", 0.5),
+            ("TargetCompression", "Run", 7.0),
+            ("InitialGap", "Contact", 0.05),
+            ("PenetrationTolerance", "Contact", 1e-2),
+            ("GapTolerance", "Contact", 1e-6),
+            ("ZBottom", "Contact", 0.0),
+            ("PlaneTolerance", "Model", 1e-7),
+        )
+        for name, group, default in float_properties:
+            _add(obj, name, "App::PropertyFloat", group, default)
+
+        integer_properties = (("VtkEvery", "Output", 1),)
+        for name, group, default in integer_properties:
+            _add(obj, name, "App::PropertyInteger", group, default)
+
+        bool_properties = (
+            ("NodalCsvEnabled", "Output", False),
+            ("GeometryOnly", "Run", False),
+            ("AugmentedLagrangeEnabled", "Contact", True),
+            ("ThermalContactEnabled", "Contact", False),
+            ("ALEEnabled", "Advanced", False),
+            ("RemeshEnabled", "Advanced", False),
+        )
+        for name, group, default in bool_properties:
+            _add(obj, name, "App::PropertyBool", group, default)
+
+        if "Status" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyEnumeration", "Status", "CTform")
+            obj.Status = ["New", "Ready", "Running", "Completed", "Failed"]
+            obj.Status = "New"
+        if "Case" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyLink", "Case", "CTform")
 
 
 def make_case(doc, name="CTformCase"):
@@ -176,18 +183,21 @@ def make_solver(doc, case=None, name="CTformSolver"):
     analysis = analysis_for_case(case)
     if analysis is None:
         raise ValueError("The CTform case is not a child of a FEM analysis")
+    if find_solver(case) is not None:
+        raise ValueError("This CTform case already has a Solver")
     solver = doc.addObject("Fem::FemSolverObjectPython", name)
     solver.Label = "CTform Solver"
-    solver.addProperty("App::PropertyLink", "Case", "CTform")
+    solver.Proxy = CTformSolver(solver)
     solver.Case = case
-    solver.addProperty("App::PropertyEnumeration", "Status", "CTform")
-    solver.Status = ["New", "Ready", "Running", "Completed", "Failed"]
-    solver.Status = "New"
-    solver.addProperty("App::PropertyString", "CaseDirectory", "CTform")
-    solver.CaseDirectory = case.CaseDirectory
     analysis.addObject(solver)
 
     return solver
+
+
+def _add(obj, name, property_type, group, default):
+    if name not in obj.PropertiesList:
+        obj.addProperty(property_type, name, group)
+        setattr(obj, name, default)
 
 
 def analysis_for_case(case):
@@ -211,6 +221,22 @@ def find_case(doc):
             obj
             for obj in doc.Objects
             if isinstance(getattr(obj, "Proxy", None), CTformCase)
+        ),
+        None,
+    )
+
+
+def find_solver(case):
+    """Return the CTform Solver owned by the same FEM Analysis as the case."""
+    analysis = analysis_for_case(case)
+    if analysis is None:
+        return None
+    return next(
+        (
+            member
+            for member in (getattr(analysis, "Group", ()) or ())
+            if isinstance(getattr(member, "Proxy", None), CTformSolver)
+            and getattr(member, "Case", None) is case
         ),
         None,
     )

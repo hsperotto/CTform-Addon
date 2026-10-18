@@ -11,8 +11,9 @@ import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtWidgets
 
-from .analysis import analysis_for_case, find_case, make_case, make_solver
+from .analysis import analysis_for_case, find_case, find_solver, make_case, make_solver
 from .case_export import write_case_json
+from .components import CTformTool, CTformWorkpiece, make_tool, make_workpiece
 from .contacts import make_contact_pair
 from .loadsteps import (
     CTformLoadStep,
@@ -22,10 +23,9 @@ from .loadsteps import (
     fem_condition_category,
     fem_condition_kind,
     make_load_step,
-    condition_targets_role,
+    condition_targets_tool,
 )
 from .materials import make_material
-from .roles import CTformRoleAssignment, make_role_assignment
 
 
 _ICON = os.path.join(os.path.dirname(__file__), "resources", "icons", "logo.svg")
@@ -65,7 +65,8 @@ class CreateSolverCommand:
         }
 
     def IsActive(self):
-        return App.ActiveDocument is not None and find_case(App.ActiveDocument) is not None
+        case = find_case(App.ActiveDocument) if App.ActiveDocument is not None else None
+        return case is not None and find_solver(case) is None
 
     def Activated(self):
         case = find_case(App.ActiveDocument)
@@ -86,28 +87,60 @@ class CreateMaterialCommand:
         }
 
     def IsActive(self):
-        return App.ActiveDocument is not None and find_case(App.ActiveDocument) is not None
+        return _selected_component() is not None
 
     def Activated(self):
-        case = find_case(App.ActiveDocument)
-        material = make_material(App.ActiveDocument, analysis_for_case(case), case)
+        component = _selected_component()
+        if component is None:
+            return
+        case = find_case(component.Document)
+        material = make_material(
+            component.Document, analysis_for_case(case), component=component
+        )
         App.ActiveDocument.recompute()
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(material)
 
 
-def _selected_role_and_material():
+def _is_component(obj):
+    return isinstance(getattr(obj, "Proxy", None), (CTformWorkpiece, CTformTool))
+
+
+def _component_in_case(component, case):
+    if case is None:
+        return False
+    if isinstance(getattr(component, "Proxy", None), CTformWorkpiece):
+        return getattr(case, "Workpiece", None) is component
+    return component in (getattr(case, "Tools", ()) or ())
+
+
+def _case_components(case):
+    if case is None:
+        return []
+    components = [getattr(case, "Workpiece", None)]
+    components.extend(getattr(case, "Tools", ()) or ())
+    return [component for component in components if component is not None]
+
+
+def _is_shape_object(obj):
+    return not _is_component(obj) and getattr(obj, "Shape", None) is not None
+
+
+def _selected_component():
+    selection = Gui.Selection.getSelection()
+    if len(selection) != 1 or not _is_component(selection[0]):
+        return None
+    component = selection[0]
+    if not _component_in_case(component, find_case(component.Document)):
+        return None
+    return component
+
+
+def _selected_component_and_material():
     selection = Gui.Selection.getSelection()
     if len(selection) != 2:
         return None, None
-    role = next(
-        (
-            obj
-            for obj in selection
-            if isinstance(getattr(obj, "Proxy", None), CTformRoleAssignment)
-        ),
-        None,
-    )
+    component = next((obj for obj in selection if _is_component(obj)), None)
     material = next(
         (
             obj
@@ -116,127 +149,147 @@ def _selected_role_and_material():
         ),
         None,
     )
-    if role is None or material is None or role.Document is not material.Document:
+    if component is None or material is None or component.Document is not material.Document:
         return None, None
-    case = find_case(role.Document)
+    case = find_case(component.Document)
+    analysis = analysis_for_case(case)
+    material_is_owned = any(
+        material in (getattr(owner, "Group", ()) or ())
+        for owner in _case_components(case)
+    )
     if (
-        case is None
-        or role not in (getattr(case, "RoleAssignments", ()) or ())
-        or material not in (getattr(case, "Materials", ()) or ())
+        not _component_in_case(component, case)
+        or not material_is_owned
+        and material not in (getattr(analysis, "Group", ()) or ())
     ):
         return None, None
-    return role, material
+    return component, material
 
 
 class AssignMaterialCommand:
-    """Assign a CTform material catalog entry to a geometry role."""
+    """Assign a CTform material to a Workpiece or Tool folder."""
 
     def GetResources(self):
         return {
             "Pixmap": _ICON,
             "MenuText": "Assign CTform Material",
-            "ToolTip": "Assign a selected CTform material to a workpiece or tool role",
+            "ToolTip": "Assign a selected CTform material to a Workpiece or Tool folder",
         }
 
     def IsActive(self):
-        role, material = _selected_role_and_material()
-        return role is not None and material is not None
+        component, material = _selected_component_and_material()
+        return component is not None and material is not None
 
     def Activated(self):
-        role, material = _selected_role_and_material()
-        if role is None or material is None:
+        component, material = _selected_component_and_material()
+        if component is None or material is None:
             return
-        doc = role.Document
+        doc = component.Document
         doc.openTransaction("Assign CTform material")
-        role.Material = material
+        case = find_case(doc)
+        analysis = analysis_for_case(case)
+        if material in (getattr(analysis, "Group", ()) or ()):
+            analysis.removeObject(material)
+            component.addObject(material)
+        elif not any(
+            material in (getattr(owner, "Group", ()) or ())
+            for owner in _case_components(case)
+        ):
+            component.addObject(material)
+        component.Material = material
         doc.recompute()
         doc.commitTransaction()
         Gui.Selection.clearSelection()
-        Gui.Selection.addSelection(role)
+        Gui.Selection.addSelection(component)
 
 
-def _selected_role_and_fem_mesh():
+def _selected_component_and_fem_mesh():
     selection = Gui.Selection.getSelection()
     if len(selection) != 2:
         return None, None
-    roles = [
-        obj
-        for obj in selection
-        if isinstance(getattr(obj, "Proxy", None), CTformRoleAssignment)
-    ]
+    components = [obj for obj in selection if _is_component(obj)]
     meshes = [obj for obj in selection if str(getattr(obj, "TypeId", "")).startswith("Fem::FemMesh")]
-    if len(roles) != 1 or len(meshes) != 1:
+    if len(components) != 1 or len(meshes) != 1:
         return None, None
-    role, mesh = roles[0], meshes[0]
-    case = find_case(role.Document)
+    component, mesh = components[0], meshes[0]
+    case = find_case(component.Document)
+    analysis = analysis_for_case(case)
+    mesh_is_owned = mesh in (getattr(analysis, "Group", ()) or ()) or any(
+        mesh in (getattr(owner, "Group", ()) or ())
+        for owner in _case_components(case)
+    )
     if (
-        mesh.Document is not role.Document
-        or case is None
-        or role not in (getattr(case, "RoleAssignments", ()) or ())
-        or mesh not in (getattr(analysis_for_case(case), "Group", ()) or ())
+        mesh.Document is not component.Document
+        or not _component_in_case(component, case)
+        or not mesh_is_owned
     ):
         return None, None
-    target_shape = getattr(getattr(role, "Target", None), "Shape", None)
+    target_shape = getattr(getattr(component, "Shape", None), "Shape", None)
     mesh_source = getattr(mesh, "Shape", None)
     mesh_shape = getattr(mesh_source, "Shape", mesh_source)
     if target_shape is not None and mesh_shape is not None and not mesh_shape.isSame(target_shape):
         return None, None
-    return role, mesh
+    return component, mesh
 
 
 class AssignMeshCommand:
-    """Assign a native FEM mesh object to a CTform geometry role."""
+    """Assign a native FEM mesh object to a Workpiece or Tool folder."""
 
     def GetResources(self):
         return {
             "Pixmap": _ICON,
-            "MenuText": "Assign FEM Mesh to CTform Role",
-            "ToolTip": "Link a Gmsh FEM mesh to the selected workpiece or tool role",
+            "MenuText": "Assign FEM Mesh to CTform Component",
+            "ToolTip": "Link a Gmsh FEM mesh to the selected Workpiece or Tool folder",
         }
 
     def IsActive(self):
-        role, mesh = _selected_role_and_fem_mesh()
-        return role is not None and mesh is not None
+        component, mesh = _selected_component_and_fem_mesh()
+        return component is not None and mesh is not None
 
     def Activated(self):
-        role, mesh = _selected_role_and_fem_mesh()
-        if role is None or mesh is None:
+        component, mesh = _selected_component_and_fem_mesh()
+        if component is None or mesh is None:
             return
-        doc = role.Document
-        doc.openTransaction("Assign FEM mesh to CTform role")
-        role.Mesh = mesh
+        doc = component.Document
+        doc.openTransaction("Assign FEM mesh to CTform component")
+        component.Mesh = mesh
+        case = find_case(doc)
+        analysis = analysis_for_case(case)
+        for owner in _case_components(case):
+            if owner is not component and mesh in (getattr(owner, "Group", ()) or ()):
+                owner.removeObject(mesh)
+        if mesh in (getattr(analysis, "Group", ()) or ()):
+            analysis.removeObject(mesh)
+        if mesh not in (getattr(component, "Group", ()) or ()):
+            component.addObject(mesh)
         doc.recompute()
         doc.commitTransaction()
         Gui.Selection.clearSelection()
-        Gui.Selection.addSelection(role)
+        Gui.Selection.addSelection(component)
 
 
-def _selected_workpiece_tool_roles():
+def _selected_workpiece_and_tool():
     selection = Gui.Selection.getSelection()
     if len(selection) != 2:
         return None, None
-    roles = [
-        obj
-        for obj in selection
-        if isinstance(getattr(obj, "Proxy", None), CTformRoleAssignment)
-    ]
-    if len(roles) != 2 or roles[0].Document is not roles[1].Document:
+    components = [obj for obj in selection if _is_component(obj)]
+    if len(components) != 2 or components[0].Document is not components[1].Document:
         return None, None
-    workpiece = next((role for role in roles if getattr(role, "Role", "") == "workpiece"), None)
-    tool = next((role for role in roles if getattr(role, "Role", "") == "tool"), None)
-    case = find_case(roles[0].Document)
+    workpiece = next((obj for obj in components if isinstance(obj.Proxy, CTformWorkpiece)), None)
+    tool = next((obj for obj in components if isinstance(obj.Proxy, CTformTool)), None)
+    case = find_case(components[0].Document)
     if (
         workpiece is None
         or tool is None
-        or case is None
-        or any(role not in (getattr(case, "RoleAssignments", ()) or ()) for role in roles)
+        or not _component_in_case(workpiece, case)
+        or not _component_in_case(tool, case)
     ):
         return None, None
     return workpiece, tool
 
 
 class CreateContactPairCommand:
-    """Create a visible contact pair from selected workpiece and tool roles."""
+    """Create a visible contact pair from selected Workpiece and Tool folders."""
 
     def GetResources(self):
         return {
@@ -246,17 +299,16 @@ class CreateContactPairCommand:
         }
 
     def IsActive(self):
-        workpiece, tool = _selected_workpiece_tool_roles()
+        workpiece, tool = _selected_workpiece_and_tool()
         return workpiece is not None and tool is not None
 
     def Activated(self):
-        workpiece, tool = _selected_workpiece_tool_roles()
+        workpiece, tool = _selected_workpiece_and_tool()
         if workpiece is None or tool is None:
             return
-        case = find_case(workpiece.Document)
         doc = workpiece.Document
         doc.openTransaction("Create CTform contact pair")
-        pair = make_contact_pair(doc, analysis_for_case(case), case, workpiece, tool)
+        pair = make_contact_pair(doc, workpiece, tool)
         doc.recompute()
         doc.commitTransaction()
         Gui.Selection.clearSelection()
@@ -312,14 +364,14 @@ class ExportCaseCommand:
         App.Console.PrintMessage(f"CTform case exported to {output}\n")
 
 
-class CreateRoleAssignmentCommand:
-    """Assign the selected native object to a CTform workpiece or tool role."""
+class CreateWorkpieceCommand:
+    """Create the case's Workpiece folder from the selected shape."""
 
     def GetResources(self):
         return {
             "Pixmap": _ICON,
-            "MenuText": "Assign CTform Role",
-            "ToolTip": "Assign the selected object as a workpiece or named tool",
+            "MenuText": "Create Workpiece",
+            "ToolTip": "Create a CTform Workpiece folder from the selected shape",
         }
 
     def IsActive(self):
@@ -327,43 +379,57 @@ class CreateRoleAssignmentCommand:
             App.ActiveDocument is not None
             and find_case(App.ActiveDocument) is not None
             and len(Gui.Selection.getSelection()) == 1
+            and _is_shape_object(Gui.Selection.getSelection()[0])
+            and getattr(find_case(App.ActiveDocument), "Workpiece", None) is None
         )
 
     def Activated(self):
         case = find_case(App.ActiveDocument)
-        target = Gui.Selection.getSelection()[0]
-        role, accepted = QtWidgets.QInputDialog.getItem(
-            Gui.getMainWindow(),
-            "Assign CTform Role",
-            "Role:",
-            ["workpiece", "tool"],
-            0,
-            False,
-        )
-        if not accepted:
-            return
-
-        tool_name = ""
-        if role == "tool":
-            tool_name, accepted = QtWidgets.QInputDialog.getText(
-                Gui.getMainWindow(),
-                "Name CTform Tool",
-                "Tool name:",
-                text=target.Label,
-            )
-            if not accepted or not tool_name.strip():
-                return
-
-        assignment = make_role_assignment(
-            App.ActiveDocument,
-            analysis_for_case(case),
-            target=target,
-            role=role,
-            tool_name=tool_name.strip(),
-        )
-        App.ActiveDocument.recompute()
+        shape = Gui.Selection.getSelection()[0]
+        doc = App.ActiveDocument
+        doc.openTransaction("Create CTform Workpiece")
+        workpiece = make_workpiece(doc, analysis_for_case(case), case, shape)
+        doc.recompute()
+        doc.commitTransaction()
         Gui.Selection.clearSelection()
-        Gui.Selection.addSelection(assignment)
+        Gui.Selection.addSelection(workpiece)
+
+
+class CreateToolCommand:
+    """Create a named Tool folder from the selected shape."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": _ICON,
+            "MenuText": "Create Tool",
+            "ToolTip": "Create a named CTform Tool folder from the selected shape",
+        }
+
+    def IsActive(self):
+        return (
+            App.ActiveDocument is not None
+            and find_case(App.ActiveDocument) is not None
+            and len(Gui.Selection.getSelection()) == 1
+            and _is_shape_object(Gui.Selection.getSelection()[0])
+        )
+
+    def Activated(self):
+        case = find_case(App.ActiveDocument)
+        shape = Gui.Selection.getSelection()[0]
+        tool_name, accepted = QtWidgets.QInputDialog.getText(
+            Gui.getMainWindow(), "Name CTform Tool", "Tool name:", text=shape.Label
+        )
+        if not accepted or not tool_name.strip():
+            return
+        doc = App.ActiveDocument
+        doc.openTransaction("Create CTform Tool")
+        tool = make_tool(
+            doc, analysis_for_case(case), case, shape, tool_name.strip()
+        )
+        doc.recompute()
+        doc.commitTransaction()
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(tool)
 
 
 def _selected_load_step():
@@ -444,7 +510,7 @@ def _selected_condition_and_step():
     ):
         return None, None
     kind = fem_condition_kind(condition)
-    is_tool_condition = condition_targets_role(condition, case, "tool")
+    is_tool_condition = condition_targets_tool(condition, case)
     if kind == "force" and not is_tool_condition:
         return None, None
     if is_tool_condition and kind not in (
@@ -519,7 +585,8 @@ Gui.addCommand("CTform_AssignMaterial", AssignMaterialCommand())
 Gui.addCommand("CTform_AssignMesh", AssignMeshCommand())
 Gui.addCommand("CTform_CreateContactPair", CreateContactPairCommand())
 Gui.addCommand("CTform_ExportCase", ExportCaseCommand())
-Gui.addCommand("CTform_AssignRole", CreateRoleAssignmentCommand())
+Gui.addCommand("CTform_CreateWorkpiece", CreateWorkpieceCommand())
+Gui.addCommand("CTform_CreateTool", CreateToolCommand())
 Gui.addCommand("CTform_CreateLoadStep", CreateLoadStepCommand())
 Gui.addCommand("CTform_CloneLoadStep", CloneLoadStepCommand())
 Gui.addCommand("CTform_AttachConditionToStep", AttachConditionToStepCommand())

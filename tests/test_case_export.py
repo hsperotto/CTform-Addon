@@ -15,6 +15,7 @@ from freecad.CTformFreeCADInterface.case_export import (
     write_case_json,
 )
 from freecad.CTformFreeCADInterface.contacts import contact_pair_to_dict
+from freecad.CTformFreeCADInterface.components import CTformWorkpiece
 from freecad.CTformFreeCADInterface.materials import materials_to_dict
 from freecad.CTformFreeCADInterface.loadsteps import CTformLoadStep, attach_condition
 
@@ -24,9 +25,11 @@ class CaseExportTests(unittest.TestCase):
         case = SimpleNamespace(
             SimulationName="demo",
             Process="forging",
-            MaterialFile="material.json",
             LoadStepsFile="loadsteps.json",
             ThermalFile="thermal.json",
+        )
+        solver = SimpleNamespace(
+            Dimension="2D",
             ModelingType="axisymmetric",
             MechanicalFormulation="flow",
             ContactModel="node_to_segment",
@@ -36,16 +39,9 @@ class CaseExportTests(unittest.TestCase):
             GapTolerance=1e-6,
             ThermalContactEnabled=False,
             ZBottom=0.0,
-            OutputDirectory="results_case",
-            VtkEvery=1,
-            NodalCsvEnabled=False,
-            GeometryOnly=False,
-            TargetCompression=7.0,
-            ALEEnabled=False,
-            RemeshEnabled=False,
         )
 
-        data = case_to_dict(case)
+        data = case_to_dict(case, solver=solver)
 
         self.assertEqual(data["simulationName"], "demo")
         self.assertEqual(data["simulation"]["modelingType"], "axisymmetric")
@@ -61,25 +57,12 @@ class CaseExportTests(unittest.TestCase):
         case = SimpleNamespace(
             SimulationName="demo",
             Process="forging",
-            MaterialFile="material.json",
             LoadStepsFile="loadsteps.json",
             ThermalFile="thermal.json",
-            ModelingType="axisymmetric",
-            MechanicalFormulation="flow",
-            ContactModel="node_to_segment",
-            InitialGap=0.05,
-            AugmentedLagrangeEnabled=True,
-            PenetrationTolerance=1e-2,
-            GapTolerance=1e-6,
-            ThermalContactEnabled=False,
-            ZBottom=0.0,
-            OutputDirectory="results_case",
-            VtkEvery=1,
-            NodalCsvEnabled=False,
-            GeometryOnly=False,
-            TargetCompression=7.0,
-            ALEEnabled=False,
-            RemeshEnabled=False,
+            Workpiece=None,
+            Tools=[],
+            LoadSteps=[],
+            Analysis=SimpleNamespace(Group=[]),
             CaseDirectory="",
             CaseFile="case.json",
         )
@@ -92,58 +75,64 @@ class CaseExportTests(unittest.TestCase):
             self.assertTrue((path.parent / "thermal.json").exists())
             self.assertTrue((path.parent / "loadsteps.json").exists())
 
-        def test_writer_links_assigned_fem_gmsh_mesh_into_case_package(self):
-            mesh_object = SimpleNamespace(TypeId="Fem::FemMeshGmsh")
-            role = SimpleNamespace(
-                Role="workpiece",
-                SourceFile="workpiece.dxf",
-                Target=None,
-                Mesh=mesh_object,
-                Material=None,
-                Label="CTform Role: workpiece",
-                InitialOffsetZ=0.0,
-                SymmetryR=0.0,
-            )
-            case = SimpleNamespace(
-                RoleAssignments=[role],
-                Materials=[],
-                ContactPairs=[],
-                LoadSteps=[],
-                Analysis=SimpleNamespace(Group=[]),
-                MeshFile="mesh/workpiece.msh",
-                CaseDirectory="",
-                CaseFile="case.json",
-            )
-
-            def fake_gmsh_export(mesh, output_path):
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                output_path.write_text("native gmsh mesh", encoding="utf-8")
-                return {
-                    "format": "gmsh-msh2",
-                    "lengthUnit": "m",
-                    "nodeCount": 4,
-                    "elementCount": 2,
-                    "elementTypes": ["Tri3"],
-                    "physicalGroups": [{"id": 121, "name": "Face1", "dimension": 2}],
-                }
-
-            with TemporaryDirectory() as directory, patch(
-                "freecad.CTformFreeCADInterface.case_export.export_gmsh_mesh",
-                side_effect=fake_gmsh_export,
-            ):
-                path = write_case_json(case, Path(directory) / "case.json")
-                data = json.loads(path.read_text(encoding="utf-8"))
-                mesh_path = path.parent / data["mesh"]["file"]
-                self.assertTrue(mesh_path.exists())
-
-            self.assertEqual(data["mesh"]["format"], "gmsh-msh2")
-            self.assertEqual(data["mesh"]["lengthUnit"], "m")
-            self.assertEqual(data["mesh"]["physicalGroups"][0]["id"], 121)
-
         self.assertEqual(path.name, "case.json")
         self.assertEqual(case.CaseFile, "case.json")
         self.assertEqual(data["simulationName"], "demo")
         self.assertIn('"initialGap": 5.0000000000000002e-05', case_text)
+
+    def test_writer_links_workpiece_mesh_into_case_package(self):
+        mesh_object = SimpleNamespace(TypeId="Fem::FemMeshGmsh")
+        workpiece = SimpleNamespace(
+            Mesh=mesh_object,
+            MeshFile="mesh/workpiece.msh",
+            Shape=SimpleNamespace(Label="Blank"),
+            Material=None,
+            ContactPairs=[],
+            Label='CTform Workpiece: "Blank"',
+        )
+        case = SimpleNamespace(
+            SimulationName="mesh-test",
+            Process="forging",
+            Workpiece=workpiece,
+            Tools=[],
+            LoadSteps=[],
+            Analysis=SimpleNamespace(Group=[]),
+            CaseDirectory="",
+            CaseFile="case.json",
+        )
+
+        def fake_gmsh_export(mesh, output_path):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("native gmsh mesh", encoding="utf-8")
+            return {
+                "format": "gmsh-msh2",
+                "lengthUnit": "m",
+                "nodeCount": 4,
+                "elementCount": 2,
+                "elementTypes": ["Tri3"],
+                "physicalGroups": [{"id": 121, "name": "Face1", "dimension": 2}],
+            }
+
+        def fake_geometry_export(component, output_path):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("ascii dxf", encoding="ascii")
+            return {"layers": ["Edge1"]}
+
+        with TemporaryDirectory() as directory, patch(
+            "freecad.CTformFreeCADInterface.case_export.export_gmsh_mesh",
+            side_effect=fake_gmsh_export,
+        ), patch(
+            "freecad.CTformFreeCADInterface.case_export.export_component_geometry",
+            side_effect=fake_geometry_export,
+        ):
+            path = write_case_json(case, Path(directory) / "case.json")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            mesh_path = path.parent / data["mesh"]["file"]
+            self.assertTrue(mesh_path.exists())
+
+        self.assertEqual(data["mesh"]["format"], "gmsh-msh2")
+        self.assertEqual(data["mesh"]["lengthUnit"], "m")
+        self.assertEqual(data["mesh"]["physicalGroups"][0]["id"], 121)
 
     def test_material_catalog_uses_named_fields_and_si_values(self):
         class Quantity:
@@ -174,7 +163,12 @@ class CaseExportTests(unittest.TestCase):
             FlowStressTableJSON="[]",
         )
 
-        catalog = materials_to_dict(SimpleNamespace(Materials=[material]))
+        catalog = materials_to_dict(
+            SimpleNamespace(
+                Workpiece=SimpleNamespace(Material=material),
+                Tools=[],
+            )
+        )
         record = catalog["materials"][0]
 
         self.assertNotIn("schemaVersion", catalog)
@@ -185,49 +179,32 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(record["elastic"]["youngModulus"], 2.1e11)
         self.assertEqual(record["thermal"]["specificHeat"], 460.0)
 
-    def test_named_tools_export_without_directional_roles(self):
+    def test_named_tools_export_from_tool_folders(self):
         case = SimpleNamespace(
             SimulationName="demo",
             Process="forging",
-            MaterialFile="material.json",
             LoadStepsFile="loadsteps.json",
             ThermalFile="thermal.json",
-            ModelingType="axisymmetric",
-            MechanicalFormulation="flow",
-            ContactModel="node_to_segment",
-            InitialGap=0.05,
-            AugmentedLagrangeEnabled=True,
-            PenetrationTolerance=1e-2,
-            GapTolerance=1e-6,
-            ThermalContactEnabled=False,
-            ZBottom=0.0,
-            OutputDirectory="results_case",
-            VtkEvery=1,
-            NodalCsvEnabled=False,
-            GeometryOnly=False,
-            TargetCompression=7.0,
-            ALEEnabled=False,
-            RemeshEnabled=False,
-            RoleAssignments=[
-                SimpleNamespace(Role="workpiece", SourceFile="workpiece.dxf"),
+            Workpiece=SimpleNamespace(Shape=SimpleNamespace(Label="Blank")),
+            Tools=[
                 SimpleNamespace(
-                    Role="tool",
+                    Shape=SimpleNamespace(Label="PunchBody"),
                     ToolId="tool-punch-id",
                     ToolName="Punch",
-                    SourceFile="punch.dxf",
                     ToolLayer="Profile",
                     InitialOffsetZ=1.0,
                     SymmetryR=0.0,
+                    Material=None,
                     Label="CTform Tool: Punch",
                 ),
                 SimpleNamespace(
-                    Role="tool",
+                    Shape=SimpleNamespace(Label="GuideBody"),
                     ToolId="tool-guide-id",
                     ToolName="GuidePin",
-                    SourceFile="guide_pin.dxf",
                     ToolLayer="",
                     InitialOffsetZ=0.0,
                     SymmetryR=0.0,
+                    Material=None,
                     Label="CTform Tool: GuidePin",
                 ),
             ],
@@ -236,8 +213,8 @@ class CaseExportTests(unittest.TestCase):
         tools = case_to_dict(case)["geometry"]["tools"]
 
         self.assertEqual([tool["name"] for tool in tools], ["Punch", "GuidePin"])
-        self.assertTrue(all(tool["role"] == "tool" for tool in tools))
         self.assertEqual([tool["id"] for tool in tools], ["tool-punch-id", "tool-guide-id"])
+        self.assertEqual(tools[0]["type"], "rigid")
         self.assertEqual(tools[0]["initialOffsetZ"], 0.001)
 
     def test_loadsteps_export_matches_core_shape(self):
@@ -387,16 +364,19 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(bc["value"], 0.002)
         self.assertEqual(bc["physicalGroupId"], 101)
 
-    def test_contact_pair_serializes_named_roles_and_physical_group(self):
-        workpiece = SimpleNamespace(Role="workpiece")
+    def test_contact_pair_serializes_workpiece_tool_and_physical_group(self):
+        workpiece = SimpleNamespace(
+            Proxy=object.__new__(CTformWorkpiece),
+            Label='CTform Workpiece: "Blank"',
+        )
         tool = SimpleNamespace(
-            Role="tool", ToolId="tool-upper-id", ToolName="UpperPunch", Label="UpperPunch"
+            ToolId="tool-upper-id", ToolName="UpperPunch", Label="UpperPunch"
         )
         pair = SimpleNamespace(
             PairId="pair-001",
             PairName="Workpiece to UpperPunch",
-            SlaveRole=workpiece,
-            MasterRole=tool,
+            InList=[workpiece],
+            Tool=tool,
             SlavePhysicalGroup="EdgeTop",
             MasterPhysicalGroup="ContactFace",
             GapTolerance=0.25,
@@ -416,8 +396,18 @@ class CaseExportTests(unittest.TestCase):
 
         self.assertEqual(data["id"], "pair-001")
         self.assertEqual(data["slave"]["physicalGroupId"], 7102)
-        self.assertEqual(data["master"]["name"], "UpperPunch")
+        self.assertEqual(
+            data["master"],
+            {
+                "body": "tool",
+                "name": "UpperPunch",
+                "toolId": "tool-upper-id",
+                "physicalGroup": "ContactFace",
+            },
+        )
         self.assertEqual(data["masterToolId"], "tool-upper-id")
+        self.assertEqual(data["slave"]["body"], "workpiece")
+        self.assertEqual(data["master"]["body"], "tool")
         self.assertEqual(data["friction"]["coefficient"], 0.22)
         self.assertEqual(data["gapTolerance"], 0.00025)
 
@@ -436,8 +426,8 @@ class CaseExportTests(unittest.TestCase):
             zFree=True,
             Active=True,
         )
-        assignment = SimpleNamespace(
-            Role="tool", ToolId="tool-punch-id", Target=tool_profile,
+        tool = SimpleNamespace(
+            Shape=tool_profile, ToolId="tool-punch-id",
             ToolName="Punch", Label="CTform Tool: Punch"
         )
         step = SimpleNamespace(
@@ -452,7 +442,7 @@ class CaseExportTests(unittest.TestCase):
         )
 
         exported = loadsteps_to_dict(
-            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+            SimpleNamespace(LoadSteps=[step], Tools=[tool])
         )["loadSteps"][0]
 
         self.assertEqual(exported["mechanicalBCs"], [])
@@ -469,8 +459,8 @@ class CaseExportTests(unittest.TestCase):
             References=[(tool_profile, ["Face1"])],
             Active=True,
         )
-        assignment = SimpleNamespace(
-            Role="tool", ToolId="tool-lower-id", Target=tool_profile,
+        tool = SimpleNamespace(
+            Shape=tool_profile, ToolId="tool-lower-id",
             ToolName="LowerDie", Label="CTform Tool: LowerDie"
         )
         step = SimpleNamespace(
@@ -485,7 +475,7 @@ class CaseExportTests(unittest.TestCase):
         )
 
         exported = loadsteps_to_dict(
-            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+            SimpleNamespace(LoadSteps=[step], Tools=[tool])
         )["loadSteps"][0]
 
         self.assertEqual(exported["mechanicalBCs"], [])
@@ -606,7 +596,6 @@ class CaseExportTests(unittest.TestCase):
         case = SimpleNamespace(
             Analysis=SimpleNamespace(Group=[global_condition]),
             LoadSteps=[step],
-            RoleAssignments=[],
         )
 
         exported = loadsteps_to_dict(case)
@@ -629,8 +618,8 @@ class CaseExportTests(unittest.TestCase):
             Direction=SimpleNamespace(x=0.0, y=1.0, z=0.0),
             Active=True,
         )
-        assignment = SimpleNamespace(
-            Role="tool", ToolId="tool-punch-id", Target=tool_profile,
+        tool = SimpleNamespace(
+            Shape=tool_profile, ToolId="tool-punch-id",
             ToolName="Punch", Label="CTform Tool: Punch"
         )
         step = SimpleNamespace(
@@ -645,7 +634,7 @@ class CaseExportTests(unittest.TestCase):
         )
 
         exported = loadsteps_to_dict(
-            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+            SimpleNamespace(LoadSteps=[step], Tools=[tool])
         )["loadSteps"][0]
 
         self.assertEqual(exported["tools"][0]["forceTarget"], 500.0)
@@ -661,8 +650,8 @@ class CaseExportTests(unittest.TestCase):
             Temperature=650.0,
             Active=True,
         )
-        assignment = SimpleNamespace(
-            Role="tool", ToolId="tool-punch-id", Target=tool_profile,
+        tool = SimpleNamespace(
+            Shape=tool_profile, ToolId="tool-punch-id",
             ToolName="Punch", Label="CTform Tool: Punch"
         )
         step = SimpleNamespace(
@@ -677,7 +666,7 @@ class CaseExportTests(unittest.TestCase):
         )
 
         exported = loadsteps_to_dict(
-            SimpleNamespace(LoadSteps=[step], RoleAssignments=[assignment])
+            SimpleNamespace(LoadSteps=[step], Tools=[tool])
         )["loadSteps"][0]
 
         self.assertEqual(exported["thermalBCs"], [])
@@ -751,15 +740,14 @@ class CaseExportTests(unittest.TestCase):
             References=[(tool_profile, ["Face1"])],
             Suppressed=False,
         )
-        tool_role = SimpleNamespace(
-            Role="tool",
-            Target=tool_profile,
+        tool = SimpleNamespace(
+            Shape=tool_profile,
             ToolId="tool-punch-id",
             ToolName="Punch",
             Label="CTform Tool: Punch",
         )
         case = SimpleNamespace(
-            Analysis=SimpleNamespace(Group=[condition]), RoleAssignments=[tool_role]
+            Analysis=SimpleNamespace(Group=[condition]), Tools=[tool]
         )
 
         exported = thermal_to_dict(case, physical_groups=[])

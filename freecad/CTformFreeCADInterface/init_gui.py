@@ -29,7 +29,8 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			"CTform",
 			[
 				"CTform_CreateCase",
-				"CTform_AssignRole",
+				"CTform_CreateWorkpiece",
+				"CTform_CreateTool",
 				"CTform_CreateLoadStep",
 				"CTform_CloneLoadStep",
 				"CTform_CreateSolver",
@@ -40,7 +41,8 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			"CTform",
 			[
 				"CTform_CreateCase",
-				"CTform_AssignRole",
+				"CTform_CreateWorkpiece",
+				"CTform_CreateTool",
 				"CTform_CreateLoadStep",
 				"CTform_CloneLoadStep",
 				"CTform_CreateSolver",

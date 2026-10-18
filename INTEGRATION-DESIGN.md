@@ -49,31 +49,27 @@ report a useful message when a dependent command is selected.
 
 The initial model should follow FEM's established object organization:
 
-| FreeCAD concept | CTform role |
+| FreeCAD concept | CTform object |
 | --- | --- |
-| FEM Analysis container | CTform case |
-| Material object | CTform material definition or adapter |
-| FEM/Gmsh mesh object | CTform mesh input, after validation |
+| FEM Analysis container | Dimension-neutral case tree |
+| Workpiece folder | Shape, mesh, material, and contact-pair links |
+| Tool folder | Shape, mesh, material, stable identity, and geometry settings |
+| Material object | CTform material definition linked from a component folder |
+| FEM/Gmsh mesh object | Mesh linked from its Workpiece or Tool folder |
 | Constraint-like object | CTform process or boundary condition |
-| Solver object | CTform Core job and execution object |
+| Solver object | Modeling dimension, formulation, numerical/run/output configuration |
 | Result object | CTform result fields and visualization |
 
 CTform-specific objects should use their own type names and properties rather than
 pretending to be a generic FEM solver. Native FEM objects may be referenced or
 adapted when that preserves compatibility with existing FreeCAD workflows.
 
-The case object is an orchestration container following the FEM document
-model. Geometry, mesh, and material remain separate FreeCAD document objects and
-may be placed in the native FEM analysis group using the standard FreeCAD
-mechanisms. The
-addon must not create a second mechanical-part object model just to duplicate
-those properties.
-
-CTform adds role-assignment objects that link existing document objects to
-simulation semantics such as `workpiece` and `tool`. A role
-assignment is metadata and an export mapping, not a replacement for the linked
-Part, Sketcher, FEM material, or mesh object. Simulation-wide settings remain on
-the case.
+The CTform case is a dimension-neutral orchestration object. It links one
+Workpiece folder, named Tool folders, and Load Step folders. Component folders
+directly link their native shape, mesh, and material objects; contact pairs are
+owned by the Workpiece and each links that Workpiece plus a Tool. The Solver
+owns modeling dimension/type, formulation, contact numerics, thermal/run/output,
+ALE, and remeshing settings. No second mechanical-part model is introduced.
 
 ## `case.json` as the canonical case model
 
@@ -87,22 +83,24 @@ The mapping should remain explicit:
 | FreeCAD analysis data | CTform case data |
 | --- | --- |
 | Analysis name and process | `simulationName`, `process` |
-| Axisymmetric or plane-strain selection | `simulation.modelingType` |
-| Mechanical formulation | `simulation.mechanicalFormulation` |
-| Role assignments | `geometry.workpiece`, `geometry.tools[*].role` |
+| Solver modeling type and dimension | `simulation.dimension`, `simulation.modelingType` |
+| Solver mechanical formulation | `simulation.mechanicalFormulation` |
+| Workpiece and Tool folders | `geometry.workpiece`, `geometry.tools[*]` |
 | Native geometry references | `geometry.workpiece`, tool files, or exported geometry files |
 | FreeCAD FEM/Gmsh mesh object and settings | Authoritative initial `mesh` file plus stable physical-group IDs; Core remesh preserves those IDs |
-| CTform material objects/catalog | `materialsFile` (`materials.json`) plus stable `materialId` references on workpiece/tools/regions |
-| Contact and friction objects | `contact`, `contactInterfaces` |
+| Component material links/catalog | `materialsFile` (`materials.json`) plus stable `materialId` references on workpiece/tools/regions |
+| Solver contact numerics and Workpiece-owned contact pairs | `contact`, `contactInterfaces` |
 | Load-step objects | `loadStepsFile` and `loadsteps.json` |
-| Output settings | `output` |
-| Run controls | `run`, `solver`, and related case sections |
+| Solver output settings | `output` |
+| Solver run controls | `run`, `solver`, ALE, and remesh sections |
 
 The FreeCAD document may keep richer links and UI state than `case.json`, but
 export must be deterministic and must not require the standalone legacy GUI. A
 case directory should be treated as a derived, inspectable artifact of the
 FreeCAD case. Opening an existing case should reconstruct or link the
-corresponding FreeCAD objects where possible.
+corresponding FreeCAD objects where possible. Existing development documents are
+not migrated to the new component tree; they must be rebuilt with the current
+Create Workpiece/Create Tool workflow.
 
 New package format uses one integer `schemaVersion` in `case.json` for the whole
 package; unversioned cases are legacy v1 and the new writer emits v2. V2 physical
@@ -168,16 +166,18 @@ axisymmetric coordinate convention visible:
 - FreeCAD sketch Y maps to CTform axial `z`.
 - Profiles must be planar and suitable for the selected axisymmetric model.
 
-The workbench should assign only `workpiece` and `tool` roles, with a separate
-user-defined tool name. Tool orientation, motion, and contact participation are
-configuration data, not role names.
+The workbench creates one Workpiece folder and named Tool folders directly from
+selected geometry. Tool orientation, motion, and contact participation are
+component and process data.
 
-### 3. Define the model and contact setup
+### 3. Configure Solver and contact setup
 
-Before meshing, the user defines the simulation-specific setup:
+Before meshing, the user creates a Solver. Modeling dimension/type,
+formulation, and execution controls live on that object. The user defines:
 
-- axisymmetric modeling mode
-- workpiece and tool roles
+- dimension and modeling type
+- mechanical formulation
+- Workpiece and Tool folders
 - contact pairs
 - initial gaps or positioning
 - friction settings
@@ -213,8 +213,8 @@ The supported forging mapping is deliberately narrower than the full FEM catalog
 | FEM concept | CTform treatment |
 | --- | --- |
 | Fixed constraint | Native FEM condition; export as a fixed workpiece-region condition or zero-motion state on a named tool. |
-| Displacement constraint | Native FEM condition; export as a workpiece displacement or, on a named tool role, as per-step tool velocity. |
-| Force constraint | Native FEM condition; supported only on a named tool role, where it selects CTform force control. |
+| Displacement constraint | Native FEM condition; export as a Workpiece displacement or, on a named Tool folder, as per-step tool velocity. |
+| Force constraint | Native FEM condition; supported only on a named Tool folder, where it selects CTform force control. |
 | Temperature constraint | Native FEM condition; export as a workpiece thermal condition or tool temperature state. |
 | Heat-flux constraint | Native FEM condition; export as a workpiece thermal condition. |
 | Body heat source | Native FEM condition; export as CTform heat generation on the workpiece. |
@@ -236,8 +236,8 @@ For the first axisymmetric workflow, the minimum boundary-condition set should
 - friction parameters
 - optional initial gap and positioning
 
-Boundary-condition objects should reference stable FreeCAD geometry roles rather
-than relying only on transient mesh element numbers. The workbench may resolve
+Boundary-condition objects should reference the Shape link on the relevant
+Workpiece or Tool folder rather than relying only on transient mesh element numbers. The workbench may resolve
 The task-panel flow should group conditions by purpose:
 Supports and symmetry
 Tool motion
@@ -284,7 +284,7 @@ are pinned from group dimension/name in the generated `.geo`, and MSH coordinate
 are scaled from FreeCAD millimeters to SI meters. Core remeshing must preserve
 the exported physical-group names and IDs.
 
-Role geometry is exported as plain ASCII DXF profile snapshots because the Core
+Component geometry is exported as plain ASCII DXF profile snapshots because the Core
 DXF reader consumes that text format and rejects binary DXF. Workpiece edge
 layers preserve FreeCAD `EdgeN` names so they can match Gmsh physical groups;
 tool profiles use their named tool-profile layer. Both mesh and DXF snapshots are
@@ -292,7 +292,8 @@ scaled to meters and linked from the v2 package.
 
 ### 6. Define load steps and simulation fields
 
-The user defines the minimum run configuration:
+The user defines load-step scheduling on Load Step folders and the run
+configuration on Solver:
 
 - simulation name
 - load-step count and duration
@@ -312,7 +313,8 @@ compatibility in the task panel.
 
 Only after a successful preflight should the workbench export or synchronize the
 case package (`case.json`, `loadsteps.json`, material data, mesh, and referenced
-geometry).
+geometry). This is a development-only clean break; saved documents built with
+the previous tree are recreated rather than migrated.
 
 ### 8. Run CTform Core
 
@@ -339,10 +341,10 @@ document can be reopened without losing provenance.
 
 ```text
 Create CTform Case
-  -> Select Axisymmetric
+  -> Create Solver and select dimension/modeling type
   -> Create Workpiece and Tool Profiles
-  -> Assign Roles and Contact Setup
-  -> Assign Materials
+  -> Create Workpiece-to-Tool Contact Pairs
+  -> Add Materials to Component Folders
   -> Generate 2D Gmsh Mesh
   -> Define Load Steps and Simulation Fields
   -> Validate and Save Case

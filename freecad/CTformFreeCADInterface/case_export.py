@@ -8,11 +8,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .analysis import find_solver
 from .loadsteps import fem_condition_category
 from .materials import material_readiness_issues, materials_to_dict
 from .contacts import contact_pair_to_dict
 from .gmsh_package import export_gmsh_mesh
-from .geometry_export import export_role_geometry
+from .geometry_export import export_component_geometry
 from .json_export import dumps_si
 
 
@@ -42,15 +43,17 @@ def case_to_dict(
     case: object,
     mesh_info: dict[str, Any] | None = None,
     geometry_info: dict[int, dict[str, Any]] | None = None,
+    solver: object | None = None,
 ) -> dict[str, Any]:
-    """Convert CTform case settings into a Core-compatible case dictionary."""
+    """Convert case structure and Solver settings into the package manifest."""
+    solver = solver or find_solver(case)
     package_version = int(_value(case, "PackageSchemaVersion", SCHEMA_VERSION))
     if package_version != SCHEMA_VERSION:
         raise ValueError(
             f"This addon writes package schema v{SCHEMA_VERSION}; "
             f"case requests unsupported schema v{package_version}"
         )
-    geometry = _geometry_from_roles(case, geometry_info)
+    geometry = _geometry_from_components(case, geometry_info)
     material_catalog = materials_to_dict(case)
     return {
         "schemaVersion": package_version,
@@ -61,23 +64,24 @@ def case_to_dict(
         "loadStepsFile": _value(case, "LoadStepsFile", "loadsteps.json"),
         "thermalFile": _value(case, "ThermalFile", "thermal.json"),
         "simulation": {
-            "modelingType": _value(case, "ModelingType", "axisymmetric"),
-            "mechanicalFormulation": _value(case, "MechanicalFormulation", "flow"),
+            "dimension": _value(solver, "Dimension", "2D"),
+            "modelingType": _value(solver, "ModelingType", "axisymmetric"),
+            "mechanicalFormulation": _value(solver, "MechanicalFormulation", "flow"),
         },
         "geometry": geometry,
         "mesh": mesh_info or {},
         "contact": {
-            "model": _value(case, "ContactModel", "node_to_segment"),
-            "initialGap": _length_to_si(_value(case, "InitialGap", 0.05)),
-            "augmentedLagrangeEnabled": _value(case, "AugmentedLagrangeEnabled", True),
-            "penetrationTolerance": _length_to_si(_value(case, "PenetrationTolerance", 1e-2)),
-            "gapTolerance": _length_to_si(_value(case, "GapTolerance", 1e-6)),
-            "thermalContactEnabled": _value(case, "ThermalContactEnabled", False),
-            "zBottom": _length_to_si(_value(case, "ZBottom", 0.0)),
+            "model": _value(solver, "ContactModel", "node_to_segment"),
+            "initialGap": _length_to_si(_value(solver, "InitialGap", 0.05)),
+            "augmentedLagrangeEnabled": _value(solver, "AugmentedLagrangeEnabled", True),
+            "penetrationTolerance": _length_to_si(_value(solver, "PenetrationTolerance", 1e-2)),
+            "gapTolerance": _length_to_si(_value(solver, "GapTolerance", 1e-6)),
+            "thermalContactEnabled": _value(solver, "ThermalContactEnabled", False),
+            "zBottom": _length_to_si(_value(solver, "ZBottom", 0.0)),
         },
         "contactInterfaces": [
             contact_pair_to_dict(pair, (mesh_info or {}).get("physicalGroups"))
-            for pair in (getattr(case, "ContactPairs", ()) or ())
+            for pair in (getattr(getattr(case, "Workpiece", None), "ContactPairs", ()) or ())
         ],
         "conditionPrecedence": {
             "analysisRoot": "global",
@@ -85,20 +89,20 @@ def case_to_dict(
             "localOverridesGlobal": True,
         },
         "output": {
-            "directory": _value(case, "OutputDirectory", "results_case"),
-            "vtkEvery": _value(case, "VtkEvery", 1),
-            "nodalCsvEnabled": _value(case, "NodalCsvEnabled", False),
+            "directory": _value(solver, "OutputDirectory", "results_case"),
+            "vtkEvery": _value(solver, "VtkEvery", 1),
+            "nodalCsvEnabled": _value(solver, "NodalCsvEnabled", False),
         },
         "run": {
-            "geometryOnly": _value(case, "GeometryOnly", False),
-            "targetCompression": _length_to_si(_value(case, "TargetCompression", 7.0)),
+            "geometryOnly": _value(solver, "GeometryOnly", False),
+            "targetCompression": _length_to_si(_value(solver, "TargetCompression", 7.0)),
         },
-        "ale": {"enabled": _value(case, "ALEEnabled", False)},
-        "remesh": {"enabled": _value(case, "RemeshEnabled", False)},
+        "ale": {"enabled": _value(solver, "ALEEnabled", False)},
+        "remesh": {"enabled": _value(solver, "RemeshEnabled", False)},
         "solver": {},
         "packageStatus": "draft",
         "readinessIssues": _readiness_issues(
-            case, mesh_info, material_catalog, geometry_info
+            case, mesh_info, material_catalog, geometry_info, solver
         ),
     }
 
@@ -109,7 +113,7 @@ def write_case_json(case: object, path: str | Path) -> Path:
     if output.suffix.lower() != ".json":
         output = output / "case.json"
     mesh_info = _export_workpiece_mesh(case, output.parent)
-    geometry_info = _export_role_geometries(case, output.parent)
+    geometry_info = _export_component_geometries(case, output.parent)
     case_data = case_to_dict(case, mesh_info, geometry_info)
     material_data = materials_to_dict(case)
     physical_groups = (mesh_info or {}).get("physicalGroups")
@@ -129,20 +133,14 @@ def write_case_json(case: object, path: str | Path) -> Path:
 
 
 def _export_workpiece_mesh(case: object, package_directory: Path) -> dict[str, Any] | None:
-    workpiece_roles = [
-        assignment
-        for assignment in (getattr(case, "RoleAssignments", ()) or ())
-        if getattr(assignment, "Role", "") == "workpiece"
-    ]
-    if len(workpiece_roles) > 1:
-        raise ValueError("CTform v2 currently supports exactly one workpiece role")
-    if not workpiece_roles:
+    workpiece = getattr(case, "Workpiece", None)
+    if workpiece is None:
         return None
-    mesh_object = getattr(workpiece_roles[0], "Mesh", None)
+    mesh_object = getattr(workpiece, "Mesh", None)
     if mesh_object is None:
         return None
 
-    relative_path = Path(_value(case, "MeshFile", "workpiece.msh"))
+    relative_path = Path(_value(workpiece, "MeshFile", "workpiece.msh"))
     if relative_path.is_absolute() or ".." in relative_path.parts:
         raise ValueError("MeshFile must be a relative path inside the case package")
     metadata = export_gmsh_mesh(
@@ -153,30 +151,26 @@ def _export_workpiece_mesh(case: object, package_directory: Path) -> dict[str, A
     return metadata
 
 
-def _export_role_geometries(
+def _export_component_geometries(
     case: object, package_directory: Path
 ) -> dict[int, dict[str, Any]]:
     geometry_info = {}
-    roles = list(getattr(case, "RoleAssignments", ()) or ())
-    workpieces = [role for role in roles if getattr(role, "Role", "") == "workpiece"]
-    if len(workpieces) > 1:
-        raise ValueError("CTform v2 currently supports one workpiece geometry role")
-    for role in roles:
-        role_type = str(getattr(role, "Role", ""))
-        if role_type not in ("workpiece", "tool"):
-            continue
-        if role_type == "workpiece":
+    workpiece = getattr(case, "Workpiece", None)
+    components = ([workpiece] if workpiece is not None else [])
+    components.extend(getattr(case, "Tools", ()) or ())
+    for component in components:
+        if component is workpiece:
             relative_path = Path("geometry/workpiece.dxf")
         else:
-            tool_id = str(getattr(role, "ToolId", ""))
+            tool_id = str(getattr(component, "ToolId", ""))
             if not tool_id:
-                raise ValueError(f"Tool role {role.Label!r} has no stable ToolId")
+                raise ValueError(f"Tool {component.Label!r} has no stable ToolId")
             relative_path = Path("geometry/tools") / f"{tool_id}.dxf"
         if relative_path.is_absolute() or ".." in relative_path.parts:
             raise ValueError("Geometry output paths must stay inside the case package")
-        info = export_role_geometry(role, package_directory / relative_path)
+        info = export_component_geometry(component, package_directory / relative_path)
         info["file"] = relative_path.as_posix()
-        geometry_info[id(role)] = info
+        geometry_info[id(component)] = info
     return geometry_info
 
 
@@ -185,31 +179,34 @@ def _readiness_issues(
     mesh_info: dict[str, Any] | None,
     material_catalog: dict[str, Any] | None = None,
     geometry_info: dict[int, dict[str, Any]] | None = None,
+    solver: object | None = None,
 ) -> list[str]:
     issues = []
-    roles = list(getattr(case, "RoleAssignments", ()) or ())
-    workpieces = [role for role in roles if getattr(role, "Role", "") == "workpiece"]
-    tools = [role for role in roles if getattr(role, "Role", "") == "tool"]
-    if len(workpieces) != 1:
-        issues.append("Assign exactly one workpiece role.")
+    workpiece = getattr(case, "Workpiece", None)
+    tools = list(getattr(case, "Tools", ()) or ())
+    if workpiece is None:
+        issues.append("Create one CTform Workpiece folder.")
     if not mesh_info:
-        issues.append("Assign and generate a 2D FEM/Gmsh mesh for the workpiece.")
+        issues.append("Assign and generate a FEM/Gmsh mesh for the Workpiece.")
     if not tools:
-        issues.append("Assign at least one named tool role and define its contact participation.")
-    if any(getattr(role, "Material", None) is None for role in roles):
-        issues.append("Assign a CTform material to every workpiece and tool role.")
-    if geometry_info is not None and any(id(role) not in geometry_info for role in roles):
-        issues.append("Export an ASCII SI DXF profile for each geometry role.")
-    if any(not getattr(role, "ToolId", "") for role in tools):
-        issues.append("Regenerate or assign a stable ToolId to every named tool role.")
+        issues.append("Create at least one named Tool folder and define its contact participation.")
+    components = ([workpiece] if workpiece is not None else []) + tools
+    if any(getattr(component, "Material", None) is None for component in components):
+        issues.append("Add a CTform material to the Workpiece and every Tool folder.")
+    if geometry_info is not None and any(id(component) not in geometry_info for component in components):
+        issues.append("Export an ASCII SI DXF profile for each component.")
+    if any(not getattr(tool, "ToolId", "") for tool in tools):
+        issues.append("Assign a stable ToolId to every named Tool folder.")
     if material_catalog is not None:
         issues.extend(material_readiness_issues(material_catalog))
-    if not getattr(case, "ContactPairs", ()):
-        issues.append("Define at least one explicit CTform contact pair.")
+    if workpiece is None or not getattr(workpiece, "ContactPairs", ()):
+        issues.append("Add at least one explicit contact pair to the Workpiece.")
+    if solver is None:
+        issues.append("Create a CTform Solver and configure its modeling and execution settings.")
+    elif str(getattr(solver, "Dimension", "2D")) != "2D":
+        issues.append("Current geometry and mesh export supports 2D Solver configurations only.")
     if geometry_info is None and tools:
-        issues.append("Export ASCII SI DXF profile files for the named tools.")
-        if any(not getattr(role, "SourceFile", "") for role in tools):
-            issues.append("Export a geometry reference for every tool role.")
+        issues.append("Export ASCII SI DXF profile files for the Tools.")
     return issues
 
 
@@ -220,6 +217,7 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
 
 def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
     """Write process thermal state; intrinsic material properties live in materials.json."""
+    solver = find_solver(case)
     thermal_bcs = []
     initial_temperature_conditions = []
     for index, condition in enumerate(_root_conditions(case, "thermal")):
@@ -237,17 +235,17 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         )
     return {
         "initialTemperature": {
-            "workpiece": _temperature_to_si(_value(case, "WorkpieceInitialTemperature", 293.15)),
-            "tools": _temperature_to_si(_value(case, "ToolInitialTemperature", 293.15)),
+            "workpiece": _temperature_to_si(_value(solver, "WorkpieceInitialTemperature", 293.15)),
+            "tools": _temperature_to_si(_value(solver, "ToolInitialTemperature", 293.15)),
         },
         "initialTemperatureConditions": initial_temperature_conditions,
-        "thermalPlasticEfficiency": _value(case, "ThermalPlasticEfficiency", 0.9),
-        "thermalFrictionEfficiency": _value(case, "ThermalFrictionEfficiency", 0.0),
+        "thermalPlasticEfficiency": _value(solver, "ThermalPlasticEfficiency", 0.9),
+        "thermalFrictionEfficiency": _value(solver, "ThermalFrictionEfficiency", 0.0),
         "frictionHeatPartitionToWorkpiece": _value(
-            case, "FrictionHeatPartitionToWorkpiece", 1.0
+            solver, "FrictionHeatPartitionToWorkpiece", 1.0
         ),
-        "frictionHeatLayerDepth": _length_to_si(_value(case, "FrictionHeatLayerDepth", 0.5)),
-        "frictionHeatDistribution": _value(case, "FrictionHeatDistribution", "uniform"),
+        "frictionHeatLayerDepth": _length_to_si(_value(solver, "FrictionHeatLayerDepth", 0.5)),
+        "frictionHeatDistribution": _value(solver, "FrictionHeatDistribution", "uniform"),
         "thermalBCs": thermal_bcs,
     }
 
@@ -883,16 +881,12 @@ def _condition_tool_data(condition: object, case: object) -> dict[str, str] | No
         for reference in references
         if isinstance(reference, (tuple, list)) and reference
     ]
-    for assignment in getattr(case, "RoleAssignments", ()) or ():
-        target = getattr(assignment, "Target", None)
-        if (
-            getattr(assignment, "Role", "") == "tool"
-            and target is not None
-            and any(obj is target for obj in referenced_objects)
-        ):
+    for tool in getattr(case, "Tools", ()) or ():
+        target = getattr(tool, "Shape", None)
+        if target is not None and any(obj is target for obj in referenced_objects):
             return {
-                "id": str(getattr(assignment, "ToolId", "")),
-                "name": getattr(assignment, "ToolName", "") or assignment.Label,
+                "id": str(getattr(tool, "ToolId", "")),
+                "name": getattr(tool, "ToolName", "") or tool.Label,
             }
     return None
 
@@ -977,7 +971,7 @@ def _value(case: object, name: str, default: Any) -> Any:
     return default if value is None else value
 
 
-def _geometry_from_roles(
+def _geometry_from_components(
     case: object, geometry_info: dict[int, dict[str, Any]] | None = None
 ) -> dict[str, Any]:
     geometry_info = geometry_info or {}
@@ -993,35 +987,34 @@ def _geometry_from_roles(
         },
         "tools": [],
     }
-    for assignment in getattr(case, "RoleAssignments", ()) or ():
-        role = getattr(assignment, "Role", "")
-        source_file = getattr(assignment, "SourceFile", "")
-        export_info = geometry_info.get(id(assignment), {})
-        material = getattr(assignment, "Material", None)
+    workpiece = getattr(case, "Workpiece", None)
+    if workpiece is not None:
+        export_info = geometry_info.get(id(workpiece), {})
+        material = getattr(workpiece, "Material", None)
         material_id = getattr(material, "MaterialId", None) if material is not None else None
-        if role == "workpiece":
-            geometry["workpiece"] = {
-                "file": export_info.get("file", source_file),
-                "materialId": material_id,
-            }
-            geometry["dxf"]["workpieceLayerMap"] = {
-                layer: layer for layer in export_info.get("layers", ())
-            }
-            continue
-        if role != "tool":
-            continue
-
-        tool: dict[str, Any] = {
-            "id": str(getattr(assignment, "ToolId", "")),
-            "name": getattr(assignment, "ToolName", "") or assignment.Label,
-            "type": "rigid",
-            "file": export_info.get("file", source_file),
-            "role": "tool",
+        geometry["workpiece"] = {
+            "file": export_info.get("file", "geometry/workpiece.dxf"),
             "materialId": material_id,
         }
-        tool["toolLayer"] = getattr(assignment, "ToolLayer", "") or "ToolProfile"
-        tool["initialOffsetZ"] = _length_to_si(getattr(assignment, "InitialOffsetZ", 0.0))
-        tool["symmetryR"] = _length_to_si(getattr(assignment, "SymmetryR", 0.0))
+        geometry["dxf"]["workpieceLayerMap"] = {
+            layer: layer for layer in export_info.get("layers", ())
+        }
+    for tool_component in getattr(case, "Tools", ()) or ():
+        export_info = geometry_info.get(id(tool_component), {})
+        material = getattr(tool_component, "Material", None)
+        material_id = getattr(material, "MaterialId", None) if material is not None else None
+        tool: dict[str, Any] = {
+            "id": str(getattr(tool_component, "ToolId", "")),
+            "name": getattr(tool_component, "ToolName", "") or tool_component.Label,
+            "type": "rigid",
+            "file": export_info.get(
+                "file", f"geometry/tools/{getattr(tool_component, 'ToolId', '')}.dxf"
+            ),
+            "materialId": material_id,
+        }
+        tool["toolLayer"] = getattr(tool_component, "ToolLayer", "") or "ToolProfile"
+        tool["initialOffsetZ"] = _length_to_si(getattr(tool_component, "InitialOffsetZ", 0.0))
+        tool["symmetryR"] = _length_to_si(getattr(tool_component, "SymmetryR", 0.0))
         geometry["tools"].append(tool)
     return geometry
 

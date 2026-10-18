@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # SPDX-FileNotice: Part of the CTform FreeCAD Interface addon.
 
-"""Visible CTform workpiece/tool contact-pair objects."""
+"""Visible CTform Workpiece/Tool contact-pair objects."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import uuid
 
 
 class CTformContactPair:
-    """A named contact interface between CTform geometry roles."""
+    """A named contact interface owned by its Workpiece."""
 
     def __init__(self, obj):
         self.Object = obj
@@ -25,8 +25,7 @@ class CTformContactPair:
         obj = self.Object
         _add(obj, "PairId", "App::PropertyString", "Identity", uuid.uuid4().hex)
         _add(obj, "PairName", "App::PropertyString", "Contact", "Workpiece Tool Contact")
-        _add(obj, "SlaveRole", "App::PropertyLink", "Contact", None)
-        _add(obj, "MasterRole", "App::PropertyLink", "Contact", None)
+        _add(obj, "Tool", "App::PropertyLink", "Contact", None)
         _add(obj, "SlavePhysicalGroup", "App::PropertyString", "Contact", "All")
         _add(obj, "MasterPhysicalGroup", "App::PropertyString", "Contact", "")
         _add(obj, "GapTolerance", "App::PropertyLength", "Normal", 0.0)
@@ -44,35 +43,43 @@ class CTformContactPair:
         self._add_properties()
 
 
-def make_contact_pair(doc, analysis, case, slave_role, master_role):
-    """Create a contact pair from one workpiece role and one named tool role."""
-    if getattr(slave_role, "Role", "") != "workpiece":
-        raise ValueError("A CTform contact pair requires a workpiece slave role")
-    if getattr(master_role, "Role", "") != "tool":
-        raise ValueError("A CTform contact pair requires a named tool master role")
+def make_contact_pair(doc, workpiece, tool):
+    """Create a contact pair owned by a Workpiece and linked to a Tool."""
+    from .components import CTformTool, CTformWorkpiece
+
+    if not isinstance(getattr(workpiece, "Proxy", None), CTformWorkpiece):
+        raise ValueError("A CTform contact pair requires a Workpiece")
+    if not isinstance(getattr(tool, "Proxy", None), CTformTool):
+        raise ValueError("A CTform contact pair requires a Tool")
     obj = doc.addObject("App::FeaturePython", "CTformContactPair")
     obj.Proxy = CTformContactPair(obj)
-    obj.SlaveRole = slave_role
-    obj.MasterRole = master_role
-    tool_name = getattr(master_role, "ToolName", "") or master_role.Label
+    obj.Tool = tool
+    tool_name = getattr(tool, "ToolName", "") or tool.Label
     obj.PairName = f"Workpiece to {tool_name}"
     obj.Label = obj.PairName
-    analysis.addObject(obj)
-    if "ContactPairs" not in case.PropertiesList:
-        case.addProperty("App::PropertyLinkList", "ContactPairs", "CTform")
-    pairs = list(getattr(case, "ContactPairs", ()) or ())
+    workpiece.addObject(obj)
+    pairs = list(getattr(workpiece, "ContactPairs", ()) or ())
     if obj not in pairs:
         pairs.append(obj)
-    case.ContactPairs = pairs
+    workpiece.ContactPairs = pairs
     return obj
 
 
 def contact_pair_to_dict(pair, mesh_groups=None):
     """Serialize a visible contact pair to the v2 contactInterfaces record."""
-    slave_role = getattr(pair, "SlaveRole", None)
-    master_role = getattr(pair, "MasterRole", None)
-    if slave_role is None or master_role is None:
-        raise ValueError(f"Contact pair {getattr(pair, 'Label', 'Contact')} has incomplete roles")
+    from .components import CTformWorkpiece
+
+    workpiece = next(
+        (
+            parent
+            for parent in (getattr(pair, "InList", ()) or ())
+            if isinstance(getattr(parent, "Proxy", None), CTformWorkpiece)
+        ),
+        None,
+    )
+    tool = getattr(pair, "Tool", None)
+    if workpiece is None or tool is None:
+        raise ValueError(f"Contact pair {getattr(pair, 'Label', 'Contact')} needs a Workpiece and Tool")
     slave_group = str(getattr(pair, "SlavePhysicalGroup", "All") or "All")
     master_group = str(getattr(pair, "MasterPhysicalGroup", "") or "")
     if mesh_groups is not None and slave_group != "All":
@@ -82,9 +89,9 @@ def contact_pair_to_dict(pair, mesh_groups=None):
         slave_reference = {"physicalGroupId": group["id"], "physicalGroup": slave_group}
     else:
         slave_reference = {"physicalGroup": slave_group}
-    master_name = getattr(master_role, "ToolName", "") or master_role.Label
-    master_tool_id = str(getattr(master_role, "ToolId", ""))
-    master_reference = {"role": "tool", "name": master_name, "toolId": master_tool_id}
+    master_name = getattr(tool, "ToolName", "") or tool.Label
+    master_tool_id = str(getattr(tool, "ToolId", ""))
+    master_reference = {"name": master_name, "toolId": master_tool_id}
     if master_group:
         master_reference["physicalGroup"] = master_group
     return {
@@ -92,12 +99,11 @@ def contact_pair_to_dict(pair, mesh_groups=None):
         "name": str(getattr(pair, "PairName", getattr(pair, "Label", "Contact"))),
         "active": bool(getattr(pair, "Active", True)),
         "slave": {"body": "workpiece", **slave_reference},
-        "master": {"body": master_name, **master_reference},
+        "master": {"body": "tool", **master_reference},
         "target": slave_group,
         "slaveBody": "workpiece",
-        "masterBody": master_name,
+        "masterBody": "tool",
         "masterToolId": master_tool_id,
-        "masterRole": "tool",
         "masterPhysicalGroup": master_group,
         "gapTolerance": _length_to_si(getattr(pair, "GapTolerance", 0.0)),
         "friction": {

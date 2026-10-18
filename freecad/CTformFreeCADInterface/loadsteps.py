@@ -246,8 +246,8 @@ def fem_condition_category(condition):
     return None
 
 
-def condition_targets_role(condition, case, role):
-    """Return whether a native condition references an object assigned the role."""
+def condition_targets_tool(condition, case):
+    """Return whether a native condition references one of the case's Tools."""
     references = getattr(condition, "References", ()) or ()
     referenced_objects = [
         reference[0]
@@ -255,9 +255,8 @@ def condition_targets_role(condition, case, role):
         if isinstance(reference, (tuple, list)) and reference
     ]
     return any(
-        getattr(assignment, "Role", "") == role
-        and any(getattr(assignment, "Target", None) is obj for obj in referenced_objects)
-        for assignment in (getattr(case, "RoleAssignments", ()) or ())
+        any(getattr(tool, "Shape", None) is obj for obj in referenced_objects)
+        for tool in (getattr(case, "Tools", ()) or ())
     )
 
 

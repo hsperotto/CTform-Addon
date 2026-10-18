@@ -35,9 +35,10 @@ These are the agreed direction for addon work and future Core changes. Do not re
 | Addon object/data | Intended Core meaning |
 | --- | --- |
 | `Fem::FemAnalysis` | One CTform case container |
-| CTform case settings | Case/process, modeling type, files, contact, run, and output settings |
-| Role assignment | Native geometry link with `workpiece` or named `tool` role |
-| Role material link | Material ID/reference for that workpiece/tool; not yet exported |
+| CTform case settings | Case identity, package paths, Workpiece/Tool links, and load steps |
+| Workpiece folder | Shape, mesh, material, and owned contact-pair links |
+| Tool folder | Shape, mesh, material, stable tool ID, and geometry/process properties |
+| CTform Solver | Dimension, modeling type, formulation, contact numerics, thermal/run/output settings |
 | FEM/Gmsh mesh | Core workpiece mesh plus stable named regions/boundaries; export incomplete |
 | Load-step group | Step schedule and its local condition children |
 | FEM condition at analysis root | Global condition inherited by every exported step |
@@ -156,7 +157,7 @@ Native FEM `ConstraintInitialTemperature` is an initial-state condition, distinc
 from `ConstraintTemperature`, which remains a thermal boundary condition. Case
 conditions are written once in `thermal.json`; step-owned initial conditions are
 written under that step in `loadsteps.json`.
-Role-level temperatures provide defaults; an explicit condition overrides its
+Component-level temperatures provide defaults; an explicit condition overrides its
 selected physical-group target, or a named tool by stable `toolId`. A step-owned
 condition initializes that target at the start of that step and does not hold it
 at the specified temperature afterward.
@@ -197,7 +198,7 @@ itself. It scales MSH node coordinates to SI meters and pins physical tags from
 group dimension/name. Never treat a separate mesh as identical to the visible
 FreeCAD mesh.
 
-**Role geometry snapshots (settled):** the addon writes ASCII DXF profile
+**Component geometry snapshots (settled):** the addon writes ASCII DXF profile
 snapshots for the workpiece and each rigid tool. It uses FreeCAD's
 `importDXF.export` with spline flattening/linear-wire output; Core's parser
 accepts the resulting ASCII LINE/ARC/LWPOLYLINE/CIRCLE/ELLIPSE entities and
@@ -206,16 +207,16 @@ tools use a named tool-profile layer. Geometry is transformed to world placement
 and scaled to SI meters before export. Keep explicit case offsets additive and
 avoid applying any placement twice.
 
-**Tool identity and motion (settled):** addon roles are `workpiece` and
-arbitrarily named `tool`. `case.json` defines tool ID, geometry, and material
-once. `loadsteps.json` references the tool ID for motion and thermal/process
+**Tool identity and motion (settled):** each Tool folder has one stable ID and
+an explicit name. `case.json` defines tool ID, geometry, and material once.
+`loadsteps.json` references the tool ID for motion and thermal/process
 state; it does not define a second tool. Core currently builds tools from both
 `geometry.tools` and per-step `tools`; refactor that path to merge by ID. A tool
 without an explicit step motion is fixed for that step unless a later process
 state rule says otherwise.
 
-**Contact pairs (settled direction):** roles do not define which surfaces contact
-or master/slave semantics. The addon owns visible named contact-pair objects and
+**Contact pairs (settled direction):** component folders do not define which surfaces contact
+or master/slave semantics. The Workpiece owns visible named contact-pair objects and
 serializes target/master physical-group IDs, friction, thermal interface data,
 and gap. A simple obvious pair may be auto-created for a workpiece and tools, but
 it must be visible and editable. Keep Core changes minimal by adapting these
@@ -249,7 +250,7 @@ pressure, force, or thermal conditions to a different quantity.
 - The current material contract does not accept arbitrary measured flow-stress families over strain, rate, and temperature.
 - `CaseConfigLoader` reads thermal conductivity and heat-capacity tables from `thermal.json`; `SimulationAssembly` forwards them to `ThermoMechanicalCoupler`.
 - Tools have separate thermal property fields in geometry/tool/thermal/load-step structures. These duplicate or fragment material-level data.
-- The addon already has a `Material` link on role assignments but does not serialize it. FEM's material UI provides common scalar properties, not CTform constitutive laws or hot-flow curve families.
+- Workpiece and Tool folders link CTform material objects that serialize into the catalog. FEM's material UI provides common scalar properties, not CTform constitutive laws or hot-flow curve families.
 
 Relevant Core sources to inspect when changing these contracts:
 
@@ -344,8 +345,8 @@ Whenever an agent/developer makes an assumption, discovers a Core limitation, ch
 ### 2026-10-17: Case-scoped material catalog
 
 - **Observed:** Core currently has one global material configuration with positional parameters and a separate elastic-modulus table. Thermal conductivity and heat-capacity tables are read from `thermal.json`. Evidence: `CaseConfigLoader.cpp`, `CaseConfig.h`, `MaterialFactory.cpp`, `SimulationAssembly.cpp`.
-- **Observed:** The addon can link a native FEM material to a role, but does not serialize the link. Evidence: addon `roles.py` and `case_export.py`.
-- **Assumption accepted for addon development:** new cases use a case-scoped `materials.json` catalog, with stable `materialId` references from workpiece/tools/regions. Core will be refactored to consume this model. Intrinsic properties move to catalog records; process thermal state and BCs remain in `thermal.json`/`loadsteps.json`.
+- **Observed:** The addon links CTform material objects from Workpiece and Tool folders and serializes stable material IDs into the case-scoped catalog. Evidence: addon `components.py`, `materials.py`, and `case_export.py`.
+- **Assumption accepted for addon development:** cases use a `materials.json` catalog with stable `materialId` references from Workpiece/Tools/regions. Core will be refactored to consume this model. Intrinsic properties move to catalog records; process thermal state and BCs remain in `thermal.json`/`loadsteps.json`.
 - **Open:** exact schema fields, legacy conversion, Celsius/Kelvin convention, heat-capacity basis, conductivity/stress units, measured-curve interpolation, and tool material requirements. These details do not reopen the accepted catalog/reference direction.
 - **Next:** trace equations and data provenance, then specify unit-normalized migration tests before implementing the new parser/writer.
 
@@ -384,7 +385,7 @@ before enabling execution.
 ### 2026-10-17: Addon v2 integration slice
 
 - **Implemented in addon:** schema-v2 SI manifest and scientific-notation JSON;
-case-local CTform material catalog with role IDs; ASCII DXF role snapshots;
+case-local CTform material catalog with component IDs; ASCII DXF component snapshots;
 process-only thermal sidecar; visible contact-pair objects; GmshTools-produced
 MSH2 and physical-group metadata; stable tool IDs; physical-group condition
 targets; root-global/step-local scopes with local override warnings; export
