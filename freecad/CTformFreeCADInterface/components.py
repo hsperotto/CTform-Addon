@@ -73,6 +73,7 @@ def make_workpiece(doc, analysis, case, shape, name="CTformWorkpiece"):
     obj.Shape = shape
     obj.Label = f'CTform Workpiece: "{shape.Label}"'
     analysis.addObject(obj)
+    obj.addObject(shape)
     case.Workpiece = obj
     return obj
 
@@ -96,6 +97,7 @@ def make_tool(
     obj.ToolName = tool_name
     obj.Label = f"CTform Tool: {tool_name}"
     analysis.addObject(obj)
+    obj.addObject(shape)
     tools = list(getattr(case, "Tools", ()) or ())
     tools.append(obj)
     case.Tools = tools

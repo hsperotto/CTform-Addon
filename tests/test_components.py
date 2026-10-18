@@ -50,6 +50,7 @@ class ComponentFolderTests(unittest.TestCase):
         )
 
         self.assertIs(workpiece.Shape, shape)
+        self.assertIn(shape, workpiece.Group)
         self.assertEqual(workpiece.Label, 'CTform Workpiece: "Blank"')
         self.assertIs(self.case.Workpiece, workpiece)
         self.assertIn(workpiece, self.analysis.Group)
@@ -63,6 +64,7 @@ class ComponentFolderTests(unittest.TestCase):
         tool = make_tool(self.doc, self.analysis, self.case, shape, "UpperPunch")
 
         self.assertIs(tool.Shape, shape)
+        self.assertIn(shape, tool.Group)
         self.assertEqual(tool.ToolName, "UpperPunch")
         self.assertTrue(tool.ToolId)
         self.assertEqual(tool.Label, "CTform Tool: UpperPunch")
