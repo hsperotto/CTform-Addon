@@ -121,10 +121,49 @@ No FEM solver commands are exposed in CTform menus.
 
 ## Current validation
 
-The addon currently has 26 passing Python tests. Python compilation and diagnostics
-also pass. The FreeCAD runtime smoke tests already confirmed that the workbench
-appears and can create a case; the updated native condition, material, mesh, and
-load-step workflow in `MANUAL-SMOKE-TEST.md` still needs a fresh interactive run.
+The addon currently has 48 passing Python tests. Python compilation and diagnostics
+also pass. FreeCAD 1.1 runtime probes have verified component-tree save/reopen,
+shared material catalog import with unit-aware values, nested Workpiece Gmsh
+MSH2 export in `From Shape` mode, and native FEM Force `DirectionVector` mapping.
+The complete GUI workflow in `MANUAL-SMOKE-TEST.md` still needs a fresh
+interactive run.
+
+## 2026-10-18 Handoff Status
+
+- **Resolved:** The Tool Force export reads FEM's `DirectionVector`, not the
+   `Direction` geometry link. For the supported XY profile, FEM X maps to CTform
+   radial X and FEM Y maps to axial Z. Tool force control remains axial only;
+   radial force and Workpiece Force are rejected. When assigning a tool Force,
+   reference the Tool folder's source face so the condition can resolve its
+   stable ToolId; selecting a separate sketch edge did not match the Tool shape.
+- **Resolved:** Initial-temperature object/property/export support was removed
+   from the addon. Ordinary Workpiece Temperature remains a maintained thermal
+   boundary condition. Tool Temperature constraints are rejected. Body Heat
+   Source and Heat Flux are outside the manual smoke-test scope (their native FEM
+   actions remain available in the workbench).
+- **Resolved:** The native FEM Gmsh command is used. Set `ElementOrder` to `1st`
+   in the task panel before generating; CTform exports first-order Tri3/Quad4.
+   `ElementDimension=From Shape` is accepted for Face/Shell shapes.
+- **Resolved:** Create Case enforces one case per document. Materials are stored
+   once in a shared case-level **CTform Materials** folder and linked from
+   Workpiece/Tool folders. The Assign Material picker imports `materials.json`
+   catalogs or selects existing entries; manual creation is the fallback.
+- **Resolved:** New Tool, material, and contact IDs are readable slugs with
+   numeric suffixes on collisions. IDs remain stable if display labels change.
+- **Sample material catalog:** `C:\Users\henri\Desktop\TCC\CTForm Addon\materials.json`
+   contains `hot-forging-steel-demo` and `h13-tool-steel-demo`. The hot-forging
+   coefficients reuse `cases/benchmarks/ring_6_3_2_mmg2d_hot/material.json`; A is
+   converted from MPa to Pa and its Celsius temperature factor is shifted to Kelvin.
+   Elastic and thermal values are illustrative estimates, not production
+   calibration.
+- **SmokeTest package issues to revisit:** `SmokeTest/loadsteps.json` repeats
+   step ID 1 and tool-record ID 1000 for both die and punch in each step. The
+   current Core reader does not implement the addon v2 contract, so keep the
+   package marked draft and do not run it as a certified case. Its two full-face
+   Temperature BCs (600 K then 450 K) are maintained constraints, not initial
+   states; confirm that is intended for the smoke scenario.
+- **Core scope:** Core has not been modified. Continue treating the v2 reader,
+   stable-ID resolution, and runtime integration as separate Core work.
 
 ## CTform Core findings
 
