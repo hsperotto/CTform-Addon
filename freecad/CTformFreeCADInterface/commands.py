@@ -100,13 +100,18 @@ class CreateMaterialCommand:
         }
 
     def IsActive(self):
-        return _selected_component() is not None
+        return _selected_component() is not None or _selected_material_library_case() is not None
 
     def Activated(self):
         component = _selected_component()
-        if component is None:
+        case = (
+            find_case(component.Document)
+            if component is not None
+            else _selected_material_library_case()
+        )
+        if case is None:
             return
-        case = find_case(component.Document)
+        doc = case.Document
         material_name, accepted = QtWidgets.QInputDialog.getText(
             Gui.getMainWindow(),
             "Create CTform Material",
@@ -116,13 +121,13 @@ class CreateMaterialCommand:
         if not accepted or not material_name.strip():
             return
         material = make_material(
-            component.Document,
+            doc,
             analysis_for_case(case),
             case,
             material_name.strip(),
             component=component,
         )
-        component.Document.recompute()
+        doc.recompute()
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(material)
 
@@ -159,6 +164,16 @@ def _selected_component():
     if not _component_in_case(component, find_case(component.Document)):
         return None
     return component
+
+
+def _selected_material_library_case():
+    selection = Gui.Selection.getSelection()
+    if len(selection) != 1:
+        return None
+    case = find_case(selection[0].Document)
+    if case is not None and getattr(case, "MaterialLibrary", None) is selection[0]:
+        return case
+    return None
 
 
 def _choose_material_for_component(component):

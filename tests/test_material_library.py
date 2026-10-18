@@ -7,6 +7,7 @@ from freecad.CTformFreeCADInterface.analysis import make_case
 from freecad.CTformFreeCADInterface.components import make_tool, make_workpiece
 from freecad.CTformFreeCADInterface.materials import (
     import_material_catalog,
+    make_material,
     materials_in_case,
     materials_to_dict,
 )
@@ -109,6 +110,15 @@ class MaterialLibraryTests(unittest.TestCase):
 
         self.assertIs(first[0], second[0])
         self.assertEqual(len(materials_in_case(self.case)), 1)
+
+    def test_manual_material_creation_from_library_does_not_assign_component(self):
+        material = make_material(
+            self.doc, self.analysis, self.case, "Manual Test Steel"
+        )
+
+        self.assertIn(material, self.case.MaterialLibrary.Group)
+        self.assertEqual(material.MaterialId, "manual-test-steel")
+        self.assertIsNone(self.workpiece.Material)
 
     def test_invalid_catalog_does_not_partially_import(self):
         catalog = self.source_catalog()
