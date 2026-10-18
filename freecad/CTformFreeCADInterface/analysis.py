@@ -117,8 +117,6 @@ class CTformSolver:
             _add(obj, name, "App::PropertyString", group, default)
 
         float_properties = (
-            ("WorkpieceInitialTemperature", "Thermal", 293.15),
-            ("ToolInitialTemperature", "Thermal", 293.15),
             ("ThermalPlasticEfficiency", "Thermal", 0.9),
             ("ThermalFrictionEfficiency", "Thermal", 0.0),
             ("FrictionHeatPartitionToWorkpiece", "Thermal", 1.0),

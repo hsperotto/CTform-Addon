@@ -77,7 +77,6 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			["CTform", "Materials"],
 			[
 				"CTform_AssignMaterial",
-				"CTform_AssignMaterial",
 				"CTform_CreateMaterial",
 			],
 		)
@@ -96,7 +95,6 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"FEM_ConstraintDisplacement",
 				"FEM_ConstraintForce",
 				"FEM_ConstraintTemperature",
-				"FEM_ConstraintInitialTemperature",
 				"FEM_ConstraintHeatflux",
 				"FEM_ConstraintBodyHeatSource",
 				"CTform_AttachConditionToStep",
@@ -111,7 +109,6 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"FEM_ConstraintDisplacement",
 				"FEM_ConstraintForce",
 				"FEM_ConstraintTemperature",
-				"FEM_ConstraintInitialTemperature",
 				"FEM_ConstraintHeatflux",
 				"FEM_ConstraintBodyHeatSource",
 				"CTform_AttachConditionToStep",

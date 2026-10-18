@@ -184,8 +184,7 @@ workflow is more complete.
    current export supports planar profiles/entities understood by the Core ASCII
    DXF parser.
 2. Map native FEM convection/radiation fields to Core thermal inputs, including
-   ambient temperature. Native FEM initial-temperature conditions now export as
-   separate case- or step-scoped initial state.
+   ambient temperature.
 3. Validate contact-pair physical-group references and add conflict/preflight
    diagnostics for arbitrary groups and complex pair topology.
 4. Resolve Core's global-tool plus per-step-tool merge behavior before running

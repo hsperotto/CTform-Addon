@@ -18,7 +18,7 @@ These are the agreed direction for addon work and future Core changes. Do not re
 
 1. **Materials are a case-scoped catalog.** New packages use `materials.json`, containing named material records with stable IDs. Workpiece, tools, and future regions refer to those IDs from `case.json`.
 2. **Material properties belong to materials.** Constitutive models/curves, elasticity, density, conductivity, specific heat, and other intrinsic thermomechanical data belong in material records, not `thermal.json`.
-3. **Thermal files describe process state and conditions.** Initial temperatures, ambient/environment conditions, thermal boundary conditions, plastic/friction heat settings, and thermal-contact controls belong in `thermal.json` or the appropriate load step. Initial temperature is state, not an intrinsic material property.
+3. **Thermal files describe process conditions.** Ambient/environment conditions, thermal boundary conditions, plastic/friction heat settings, and thermal-contact controls belong in `thermal.json` or the appropriate load step.
 4. **CTform material data is authoritative.** Only CTform material objects are authored and assigned in this workflow. Native FEM/standard material commands are not exposed; export a deterministic snapshot and do not depend on a live mutable global FreeCAD library at solve time.
 5. **Legacy material files remain readable during migration.** Existing singular `material.json` inputs normalize to a one-entry default catalog. New addon work targets the catalog contract.
 6. **Keep the files readable.** Prefer one case-local `materials.json` over one file per geometry object or a remote database. Use named fields, explicit units, simple references, and concise metadata.
@@ -150,17 +150,8 @@ integers.
 
 - `case.json`: case identity, simulation type/formulation, geometry/tool identity and material references, mesh references, contact setup, run/output settings, sidecar references.
 - `materials.json`: CTform constitutive model and parameters or measured flow curves; elastic properties; density; conductivity, heat capacity, expansion, and other intrinsic material data.
-- `thermal.json`: default and native FEM initial-temperature conditions; ambient conditions and thermal BCs; thermal plastic/friction efficiencies; contact heat-transfer/process controls.
-- `loadsteps.json`: time window/increments; step-local mechanical/thermal BCs and initial-temperature conditions; per-step tool motion and thermal state.
-
-Native FEM `ConstraintInitialTemperature` is an initial-state condition, distinct
-from `ConstraintTemperature`, which remains a thermal boundary condition. Case
-conditions are written once in `thermal.json`; step-owned initial conditions are
-written under that step in `loadsteps.json`.
-Component-level temperatures provide defaults; an explicit condition overrides its
-selected physical-group target, or a named tool by stable `toolId`. A step-owned
-condition initializes that target at the start of that step and does not hold it
-at the specified temperature afterward.
+- `thermal.json`: ambient conditions and thermal BCs; thermal plastic/friction efficiencies; contact heat-transfer/process controls.
+- `loadsteps.json`: time window/increments; step-local mechanical/thermal BCs; per-step tool motion and thermal state.
 
 Tool temperature/motion can vary by process step; tool identity and its intrinsic material reference do not. Do not copy material data into every step.
 
@@ -267,7 +258,7 @@ Relevant Core sources to inspect when changing these contracts:
 
 ## Open Technical Questions (Do Not Guess)
 
-1. **Temperature convention:** V2 input temperature is Kelvin. Existing v1 initial temperatures include `1173.15`; modulus tables include `20, 200, ...`; some thermal tables include `293.15`-style values. Determine each legacy field's convention and whether Hensel-Spittel coefficients were calibrated for Celsius or Kelvin. The v1 adapter must preserve legacy meaning; the v2 law receives Kelvin.
+1. **Temperature convention:** V2 input temperature is Kelvin. Existing v1 modulus and thermal tables include Celsius-style values such as `20, 200, ...` and Kelvin-style values such as `293.15`. Determine each legacy field's convention and whether Hensel-Spittel coefficients were calibrated for Celsius or Kelvin. The v1 adapter must preserve legacy meaning; the v2 law receives Kelvin.
 2. **Heat-capacity basis:** FEM `SpecificHeat` is mass-specific. Some Core example heat-capacity values are around `2.4e6`, suggesting volumetric heat capacity. Trace the heat equation and benchmark before converting or renaming.
 3. **Conductivity and stress units:** V2 file values use SI: conductivity `W/(m K)`, stress/pressure `Pa`, and length `m`. Determine legacy units and conversion locations at the input boundary; Core may use other internal units after one loader conversion.
 4. **Flow-curve representation:** Choose regular tensor grid or a set of curves indexed by temperature and strain rate. Define interpolation, extrapolation, sparse slices, duplicate points, valid ranges, and required derivatives before implementation.

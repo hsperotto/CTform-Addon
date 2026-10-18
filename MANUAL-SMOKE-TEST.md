@@ -96,31 +96,11 @@ export adapter; it does not validate a CTform Core solve.
     is intended; attach it to Step 1.
     - Pass: it becomes a child of Step 1 and the target exports as the face's
       physical-group ID/name from the assigned Gmsh mesh.
-      Do not use this as a substitute for initial temperature unless that
-      time-dependent Dirichlet condition is intended.
-    - Separately create native FEM **Initial Temperature** conditions: leave one
-      at the analysis root and attach another to Step 1.
-    - Pass: the root condition appears in `thermal.json` under
-      `initialTemperatureConditions` with `scope: global`; the step condition
-      appears in Step 1's `initialTemperatureConditions` with `scope: step`.
-      Neither appears in `thermalBCs`; selected geometry resolves to the same
-      Gmsh physical-group IDs as other native FEM conditions.
-      A condition selected on a named tool targets its stable `toolId`, not a
-      workpiece physical group.
-13. Create a native FEM **Body Heat Source** condition. Click **Add** and select
-    the whole workpiece face; attach it to Step 2.
-    - Pass: it becomes a child of Step 2 and exports as `HeatGeneration` over the
-  selected face physical group.
-14. If testing **Heat Flux**, click **Add** and select a workpiece boundary edge,
-    not the whole face. Attach it to Step 2.
-    - Pass: the edge's Gmsh physical-group ID/name is preserved. Heat flux is a
-      boundary-surface condition; whole-domain heating belongs to Body Heat
-      Source.
-15. Optionally create a native FEM **Force** condition on the upper tool by
+13. Optionally create a native FEM **Force** condition on the upper tool by
     clicking **Add** and selecting the tool. Attach it to Step 2.
     - Pass: it exports as force-controlled tool motion. Workpiece Force is not
       supported by Core and must not be attached.
-16. Select Step 1 and run **Clone Load Step**.
+14. Select Step 1 and run **Clone Load Step**.
     - Pass: the clone has a unique step ID, copies the source schedule and
       active state, and contains distinct copies of Step 1's conditions that
       still reference the same geometry. Editing a cloned condition does not
@@ -128,12 +108,12 @@ export adapter; it does not validate a CTform Core solve.
     - Pass: the cloned step is registered under the CTform analysis and in the
       case's `LoadSteps` list. Use this command instead of relying on generic
       FreeCAD copy/paste to create CTform steps.
-17. Select the whole-workpiece Temperature condition and Step 1, then run
+15. Select the whole-workpiece Temperature condition and Step 1, then run
     **Detach Condition from Load Step**.
     - Pass: the condition moves to the CTform analysis root, disappears from
       Step 1's group/category list, and is exported once in `thermal.json` as a
       global condition inherited by all steps.
-18. Export the case package to the temporary directory.
+16. Export the case package to the temporary directory.
     - Pass: `case.json`, `materials.json`, `thermal.json`, and `loadsteps.json`
       are written without a FreeCAD error dialog; `case.json` has
       `schemaVersion: 2` and unprefixed SI units.
@@ -157,7 +137,7 @@ export adapter; it does not validate a CTform Core solve.
       `scope: global`, while local conditions carry `scope: step`.
     - Pass: invalid or unexportable component geometry leaves the package marked
       `draft` with a readiness issue; do not invoke Core.
-19. Save the FreeCAD document, close it, reopen it, and repeat the export.
+17. Save the FreeCAD document, close it, reopen it, and repeat the export.
     - Pass: component links, step links, native condition objects, and exported
       values remain intact after restore; tool IDs, material IDs, and contact
       pairs are unchanged, with no proxy serialization errors or cycles.
@@ -201,8 +181,7 @@ export adapter; it does not validate a CTform Core solve.
   step makes the step its document-group parent and defines when it applies.
 - Dragging a condition into a step and using **Attach Selected Condition to Load
   Step** must produce identical group membership and exported JSON.
-- Root mechanical/thermal boundary conditions are global; root initial-temperature
-  conditions are exported once as case initial state. Detaching from a step
+- Root mechanical/thermal boundary conditions are global. Detaching from a step
   returns the condition to the analysis root.
 - **Clone Load Step** creates new child condition objects; generic FreeCAD
   copy/paste is not the supported cloning path because it does not register the
@@ -213,9 +192,6 @@ export adapter; it does not validate a CTform Core solve.
 - Tool displacement and force conditions are translated to CTform per-step tool
   data; the old CTform custom condition and tool-motion creation commands should
   not reappear in the workflow.
-- Native FEM Initial Temperature exports as separate case- or step-scoped
-  initial-state data, not as a persistent thermal boundary condition. The
-  existing Workpiece/Tool default temperatures remain available in `thermal.json`.
 - Core's thermal BC schema includes `ambientTemperature` for convection/radiation.
   It also consumes film coefficient and emissivity. Ambient heat exchange is
   therefore modeled in Core through convection/radiation thermal BC data, not as

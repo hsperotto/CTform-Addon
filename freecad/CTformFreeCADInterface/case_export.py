@@ -219,7 +219,6 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
     """Write process thermal state; intrinsic material properties live in materials.json."""
     solver = find_solver(case)
     thermal_bcs = []
-    initial_temperature_conditions = []
     for index, condition in enumerate(_root_conditions(case, "thermal")):
         if _condition_tool_name(condition, case):
             continue
@@ -227,18 +226,7 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
             _condition_to_dict(condition, index + 1, thermal=True,
                                physical_groups=physical_groups, scope="global")
         )
-    for index, condition in enumerate(_root_conditions(case, "initial_temperature")):
-        initial_temperature_conditions.extend(
-            _initial_temperature_condition_to_dict(
-                condition, index + 1, physical_groups, "global", case
-            )
-        )
     return {
-        "initialTemperature": {
-            "workpiece": _temperature_to_si(_value(solver, "WorkpieceInitialTemperature", 293.15)),
-            "tools": _temperature_to_si(_value(solver, "ToolInitialTemperature", 293.15)),
-        },
-        "initialTemperatureConditions": initial_temperature_conditions,
         "thermalPlasticEfficiency": _value(solver, "ThermalPlasticEfficiency", 0.9),
         "thermalFrictionEfficiency": _value(solver, "ThermalFrictionEfficiency", 0.0),
         "frictionHeatPartitionToWorkpiece": _value(
@@ -262,13 +250,9 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         thermal_bcs = []
         local_mechanical = _step_conditions(step, "mechanical", "MechanicalBCs")
         local_thermal = _step_conditions(step, "thermal", "ThermalBCs")
-        local_initial_temperatures = _step_conditions(
-            step, "initial_temperature", "InitialTemperatureConditions"
-        )
         step_name = getattr(step, "StepName", "LoadStep")
         local_mechanical_records = []
         local_thermal_records = []
-        initial_temperature_conditions = []
         tools = [
             {
                 "id": getattr(motion, "MotionId", 1000 + index),
@@ -280,7 +264,6 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
                 "vz": getattr(motion, "Vz", 0.0),
                 "active": getattr(motion, "Active", True),
                 "scope": "step",
-                "initialTemperature": getattr(motion, "InitialTemperature", 293.15),
                 "heatTransferCoefficient": getattr(motion, "HeatTransferCoefficient", 0.0),
             }
             for index, motion in enumerate(_step_tool_motions(step))
@@ -346,50 +329,24 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
                 )
         for index, condition in enumerate(root_thermal):
             tool_data = _condition_tool_data(condition, case)
-            tool_name = tool_data["name"] if tool_data else ""
-            if not tool_name:
+            if tool_data is None:
                 continue
-            if "temperature" not in _condition_type_name(condition):
-                raise ValueError("Only FEM temperature conditions can define global tool temperature")
-            tools.append(
-                _tool_motion_to_dict(
-                    condition, tool_name, step, 2000 + index, "global", tool_data["id"]
-                )
+            raise ValueError(
+                f"CTform does not support thermal boundary conditions on Tool {tool_data['name']!r}"
             )
         for index, condition in enumerate(local_thermal):
             tool_data = _condition_tool_data(condition, case)
-            tool_name = tool_data["name"] if tool_data else ""
-            if tool_name:
-                if "temperature" not in _condition_type_name(condition):
-                    raise ValueError("Only FEM temperature conditions can be applied to CTform tools")
-                tool_record = _tool_motion_to_dict(
-                    condition, tool_name, step, 1000 + index, "step", tool_data["id"]
+            if tool_data is not None:
+                raise ValueError(
+                    f"CTform does not support thermal boundary conditions on Tool {tool_data['name']!r}"
                 )
-                if any(item.get("name") == tool_name and item.get("scope") == "global" for item in tools):
-                    warnings.append(
-                        f"Step '{step_name}' local tool temperature '{tool_name}' "
-                        "overrides a root-global tool condition."
-                    )
-                    tools = [
-                        item
-                        for item in tools
-                        if not (item.get("name") == tool_name and item.get("scope") == "global")
-                    ]
-                tools.append(tool_record)
-            else:
-                local_thermal_records.extend(
-                    _condition_to_dict(
-                        condition,
-                        index + 1,
-                        thermal=True,
-                        physical_groups=physical_groups,
-                        scope="step",
-                    )
-                )
-        for index, condition in enumerate(local_initial_temperatures):
-            initial_temperature_conditions.extend(
-                _initial_temperature_condition_to_dict(
-                    condition, index + 1, physical_groups, "step", case
+            local_thermal_records.extend(
+                _condition_to_dict(
+                    condition,
+                    index + 1,
+                    thermal=True,
+                    physical_groups=physical_groups,
+                    scope="step",
                 )
             )
         warnings.extend(_condition_override_warnings(
@@ -413,7 +370,6 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
                 "increments": getattr(step, "Increments", 1),
                 "mechanicalBCs": mechanical_bcs,
                 "thermalBCs": thermal_bcs,
-                "initialTemperatureConditions": initial_temperature_conditions,
                 "tools": tools,
             }
         )
@@ -663,47 +619,6 @@ def _condition_to_dict(
     return output
 
 
-def _initial_temperature_condition_to_dict(
-    condition: object,
-    identifier: int,
-    physical_groups=None,
-    scope: str | None = None,
-    case: object | None = None,
-) -> list[dict[str, Any]]:
-    if getattr(condition, "EnableFinalTemperature", False):
-        raise ValueError(
-            "CTform initial-temperature conditions currently support a constant initial temperature only"
-        )
-    temperature = _first_numeric_value(
-        condition,
-        ("initialTemperature", "InitialTemperature", "Temperature", "Value"),
-        293.15,
-        "K",
-    )
-    base_id = getattr(condition, "Id", identifier)
-    name = getattr(condition, "Label", "InitialTemperature")
-    active = getattr(condition, "Active", not getattr(condition, "Suppressed", False))
-    tool_data = _condition_tool_data(condition, case) if case is not None else None
-    targets = (
-        [{"target": "tool", "toolId": tool_data["id"], "toolName": tool_data["name"]}]
-        if tool_data
-        else _condition_target_data(condition, physical_groups)
-    )
-    records = []
-    for target_index, target in enumerate(targets):
-        record = {
-            "id": base_id + target_index,
-            "name": name,
-            "temperature": temperature,
-            "active": active,
-        }
-        if scope is not None:
-            record["scope"] = scope
-        record.update(target)
-        records.append(record)
-    return records
-
-
 def _condition_type_name(condition: object) -> str:
     return " ".join(
         (
@@ -933,21 +848,6 @@ def _tool_motion_to_dict(
             "active": active,
             "scope": scope,
         }
-    if "temperature" in type_name:
-        return {
-            "id": identifier,
-            "toolId": tool_id,
-            "name": tool_name,
-            "type": "Motion",
-            "vx": 0.0,
-            "vy": 0.0,
-            "vz": 0.0,
-            "active": active,
-            "scope": scope,
-            "initialTemperature": _first_numeric_value(
-                condition, ("Temperature", "Value"), 293.15, "K"
-            ),
-        }
     if "force" in type_name:
         components = _force_components(condition)
         axial_force = next((value for axis, value in components if axis == "Z"), 0.0)
@@ -1025,7 +925,4 @@ def _length_to_si(value: object) -> float:
     return float(value) * 1e-3
 
 
-def _temperature_to_si(value: object) -> float:
-    if hasattr(value, "getValueAs"):
-        return float(value.getValueAs("K"))
-    return float(value)
+

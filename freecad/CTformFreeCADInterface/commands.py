@@ -576,8 +576,6 @@ def _selected_condition_and_step():
         "fixed",
         "displacement",
         "force",
-        "temperature",
-        "initial_temperature",
     ):
         return None, None
     return condition, step

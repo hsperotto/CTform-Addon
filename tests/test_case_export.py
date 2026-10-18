@@ -11,7 +11,6 @@ from unittest.mock import patch
 from freecad.CTformFreeCADInterface.case_export import (
     case_to_dict,
     loadsteps_to_dict,
-    thermal_to_dict,
     write_case_json,
 )
 from freecad.CTformFreeCADInterface.contacts import contact_pair_to_dict
@@ -234,7 +233,6 @@ class CaseExportTests(unittest.TestCase):
             Vy=0.0,
             Vz=-1.0,
             Active=True,
-            InitialTemperature=293.15,
             HeatTransferCoefficient=0.0,
         )
         step = SimpleNamespace(
@@ -640,7 +638,7 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(exported["tools"][0]["forceTarget"], 500.0)
         self.assertEqual(exported["tools"][0]["motion"]["axis"], "Z")
 
-    def test_native_tool_temperature_becomes_step_tool_temperature(self):
+    def test_native_tool_temperature_condition_is_rejected(self):
         tool_profile = SimpleNamespace()
         condition = SimpleNamespace(
             TypeId="Fem::ConstraintTemperature",
@@ -665,112 +663,35 @@ class CaseExportTests(unittest.TestCase):
             ToolMotions=[],
         )
 
-        exported = loadsteps_to_dict(
-            SimpleNamespace(LoadSteps=[step], Tools=[tool])
-        )["loadSteps"][0]
+        with self.assertRaisesRegex(ValueError, "thermal boundary conditions on Tool"):
+            loadsteps_to_dict(
+                SimpleNamespace(LoadSteps=[step], Tools=[tool])
+            )
 
-        self.assertEqual(exported["thermalBCs"], [])
-        self.assertEqual(exported["tools"][0]["initialTemperature"], 650.0)
-
-    def test_native_initial_temperature_exports_as_case_initial_state(self):
+    def test_native_workpiece_temperature_remains_a_thermal_boundary_condition(self):
         condition = SimpleNamespace(
-            TypeId="Fem::ConstraintInitialTemperature",
+            TypeId="Fem::ConstraintTemperature",
             Proxy=None,
-            Label="Initial workpiece temperature",
-            initialTemperature=725.0,
+            Label="Workpiece temperature BC",
             References=[],
-            Active=True,
-        )
-        case = SimpleNamespace(Analysis=SimpleNamespace(Group=[condition]))
-
-        exported = thermal_to_dict(case)
-
-        self.assertEqual(exported["thermalBCs"], [])
-        self.assertEqual(
-            exported["initialTemperatureConditions"],
-            [{
-                "id": 1,
-                "name": "Initial workpiece temperature",
-                "temperature": 725.0,
-                "active": True,
-                "scope": "global",
-                "target": "All",
-                "useZSelector": False,
-                "zSelector": 0.0,
-            }],
-        )
-
-    def test_native_initial_temperature_attaches_to_load_step_state(self):
-        condition = SimpleNamespace(
-            TypeId="Fem::ConstraintInitialTemperature",
-            Proxy=None,
-            Label="Preheated workpiece",
-            initialTemperature=850.0,
-            References=[],
+            Temperature=650.0,
             Active=True,
         )
         step = SimpleNamespace(
             StepId=1,
-            StepName="Preheat",
+            StepName="Thermal hold",
             StartTime=0.0,
             EndTime=1.0,
             Increments=1,
-            Group=[condition],
-            InitialTemperatureConditions=[condition],
             MechanicalBCs=[],
-            ThermalBCs=[],
+            ThermalBCs=[condition],
             ToolMotions=[],
         )
 
         exported = loadsteps_to_dict(SimpleNamespace(LoadSteps=[step]))["loadSteps"][0]
 
-        self.assertEqual(exported["thermalBCs"], [])
-        self.assertEqual(
-            exported["initialTemperatureConditions"][0]["temperature"], 850.0
-        )
-        self.assertEqual(exported["initialTemperatureConditions"][0]["scope"], "step")
-
-    def test_native_tool_initial_temperature_targets_stable_tool_id(self):
-        tool_profile = SimpleNamespace()
-        condition = SimpleNamespace(
-            TypeId="Fem::ConstraintInitialTemperature",
-            Proxy=None,
-            Label="Preheated punch",
-            initialTemperature=650.0,
-            References=[(tool_profile, ["Face1"])],
-            Suppressed=False,
-        )
-        tool = SimpleNamespace(
-            Shape=tool_profile,
-            ToolId="tool-punch-id",
-            ToolName="Punch",
-            Label="CTform Tool: Punch",
-        )
-        case = SimpleNamespace(
-            Analysis=SimpleNamespace(Group=[condition]), Tools=[tool]
-        )
-
-        exported = thermal_to_dict(case, physical_groups=[])
-
-        initial = exported["initialTemperatureConditions"][0]
-        self.assertEqual(initial["toolId"], "tool-punch-id")
-        self.assertEqual(initial["toolName"], "Punch")
-        self.assertEqual(initial["target"], "tool")
-        self.assertEqual(initial["temperature"], 650.0)
-
-    def test_native_initial_temperature_rejects_enabled_final_temperature(self):
-        condition = SimpleNamespace(
-            TypeId="Fem::ConstraintInitialTemperature",
-            Proxy=None,
-            Label="Time-varying initial temperature",
-            initialTemperature=300.0,
-            EnableFinalTemperature=True,
-            References=[],
-        )
-        case = SimpleNamespace(Analysis=SimpleNamespace(Group=[condition]))
-
-        with self.assertRaisesRegex(ValueError, "constant initial temperature only"):
-            thermal_to_dict(case)
+        self.assertEqual(exported["thermalBCs"][0]["type"], "Temperature")
+        self.assertEqual(exported["thermalBCs"][0]["value"], 650.0)
 
     def test_native_workpiece_force_is_rejected(self):
         condition = SimpleNamespace(
