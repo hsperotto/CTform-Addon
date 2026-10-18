@@ -50,12 +50,28 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			],
 		)
 		self.appendMenu(
-			["CTform", "Contact"],
-			["CTform_CreateContactPair"],
+			["CTform", "Geometry & Mesh"],
+			[
+				"Sketcher_NewSketch",
+				"Part_MakeFace",
+				"FEM_MeshGmshFromShape",
+				"CTform_AssignMesh",
+				"FEM_MeshRegion",
+				"FEM_MeshGroup",
+				"FEM_MeshDisplayInfo",
+				"FEM_MeshClear",
+			],
 		)
 		self.appendToolbar(
-			"CTform Contact",
-			["CTform_CreateContactPair"],
+			"CTform Geometry & Mesh",
+			[
+				"Sketcher_NewSketch",
+				"Part_MakeFace",
+				"FEM_MeshGmshFromShape",
+				"CTform_AssignMesh",
+				"FEM_MeshRegion",
+				"FEM_MeshGroup",
+			],
 		)
 		self.appendMenu(
 			["CTform", "Materials"],
@@ -72,36 +88,9 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			],
 		)
 		self.appendMenu(
-			["CTform", "Mesh"],
+			["CTform", "Contact & Conditions"],
 			[
-				"FEM_MeshGmshFromShape",
-				"CTform_AssignMesh",
-				"FEM_MeshRegion",
-				"FEM_MeshGroup",
-				"FEM_MeshDisplayInfo",
-				"FEM_MeshClear",
-			],
-		)
-		self.appendToolbar(
-			"CTform Mesh",
-			[
-				"FEM_MeshGmshFromShape",
-				"CTform_AssignMesh",
-				"FEM_MeshRegion",
-				"FEM_MeshGroup",
-			],
-		)
-		self.appendMenu(
-			["CTform", "Geometry"],
-			["Part_MakeFace"],
-		)
-		self.appendToolbar(
-			"CTform Geometry",
-			["Sketcher_NewSketch", "Part_MakeFace"],
-		)
-		self.appendMenu(
-			["CTform", "Conditions"],
-			[
+				"CTform_CreateContactPair",
 				"FEM_ConstraintFixed",
 				"FEM_ConstraintDisplacement",
 				"FEM_ConstraintForce",
@@ -114,8 +103,9 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			],
 		)
 		self.appendToolbar(
-			"CTform Conditions",
+			"CTform Contact & Conditions",
 			[
+				"CTform_CreateContactPair",
 				"FEM_ConstraintFixed",
 				"FEM_ConstraintDisplacement",
 				"FEM_ConstraintForce",
