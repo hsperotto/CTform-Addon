@@ -197,6 +197,8 @@ def _readiness_issues(
         issues.append("Export an ASCII SI DXF profile for each component.")
     if any(not getattr(tool, "ToolId", "") for tool in tools):
         issues.append("Assign a stable ToolId to every named Tool folder.")
+    if _duplicate_step_ids(getattr(case, "LoadSteps", ()) or ()):
+        issues.append("Give every Load Step a unique StepId.")
     if material_catalog is not None:
         issues.extend(material_readiness_issues(material_catalog))
     if workpiece is None or not getattr(workpiece, "ContactPairs", ()):
@@ -238,6 +240,27 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
     }
 
 
+def _duplicate_step_ids(steps) -> list[int]:
+    seen = set()
+    duplicates = []
+    for step in steps:
+        if step is None:
+            continue
+        step_id = getattr(step, "StepId", None)
+        if step_id in seen and step_id not in duplicates:
+            duplicates.append(step_id)
+        seen.add(step_id)
+    return duplicates
+
+
+def _check_unique_step_ids(steps) -> None:
+    duplicates = _duplicate_step_ids(steps)
+    if duplicates:
+        raise ValueError(
+            f"Load steps share StepId {', '.join(map(str, duplicates))}; give every step a unique StepId"
+        )
+
+
 def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
     """Convert CTform load-step objects into the Core loadsteps.json schema."""
     root_mechanical = _root_conditions(case, "mechanical")
@@ -245,6 +268,7 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
     warnings = []
     steps = []
     source_steps = list(getattr(case, "LoadSteps", ()) or ()) or [None]
+    _check_unique_step_ids(source_steps)
     for step in source_steps:
         mechanical_bcs = []
         thermal_bcs = []
@@ -361,6 +385,10 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
             record["overridesGlobal"] = _overrides_any(record, root_thermal, case, True, physical_groups)
         mechanical_bcs.extend(local_mechanical_records)
         thermal_bcs.extend(local_thermal_records)
+        # Root and step condition loops each count from 1000; renumber so every
+        # tool record in a step is unique. Tools are matched by toolId, not id.
+        for offset, record in enumerate(tools):
+            record["id"] = 1000 + offset
         steps.append(
             {
                 "id": getattr(step, "StepId", len(steps) + 1),

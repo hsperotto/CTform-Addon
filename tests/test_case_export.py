@@ -482,6 +482,72 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(exported["tools"][0]["vx"], 0.0)
         self.assertEqual(exported["tools"][0]["vz"], 0.0)
 
+    def test_global_and_step_tool_records_get_unique_ids(self):
+        die_profile = SimpleNamespace()
+        punch_profile = SimpleNamespace()
+        die_fixed = SimpleNamespace(
+            TypeId="Fem::ConstraintFixed",
+            Proxy=None,
+            Label="Fixed die",
+            References=[(die_profile, ["Face1"])],
+            Active=True,
+        )
+        punch_move = SimpleNamespace(
+            TypeId="Fem::ConstraintDisplacement",
+            Proxy=None,
+            Label="Punch displacement",
+            References=[(punch_profile, ["Edge1"])],
+            xDisplacement=0.0,
+            xFree=True,
+            yDisplacement=-6.0,
+            yFree=False,
+            zDisplacement=0.0,
+            zFree=True,
+            Active=True,
+        )
+        tools = [
+            SimpleNamespace(Shape=die_profile, ToolId="die", ToolName="Die", Label="CTform Tool: Die"),
+            SimpleNamespace(Shape=punch_profile, ToolId="punch", ToolName="Punch", Label="CTform Tool: Punch"),
+        ]
+        step = SimpleNamespace(
+            StepId=1,
+            StepName="Press",
+            StartTime=0.0,
+            EndTime=2.0,
+            Increments=20,
+            MechanicalBCs=[punch_move],
+            ThermalBCs=[],
+            ToolMotions=[],
+        )
+        case = SimpleNamespace(
+            Analysis=SimpleNamespace(Group=[die_fixed]),
+            LoadSteps=[step],
+            Tools=tools,
+        )
+
+        exported_tools = loadsteps_to_dict(case)["loadSteps"][0]["tools"]
+
+        self.assertEqual([tool["toolId"] for tool in exported_tools], ["die", "punch"])
+        self.assertEqual([tool["id"] for tool in exported_tools], [1000, 1001])
+
+    def test_duplicate_step_ids_are_rejected(self):
+        steps = [
+            SimpleNamespace(
+                StepId=1,
+                StepName=name,
+                StartTime=0.0,
+                EndTime=1.0,
+                Increments=1,
+                MechanicalBCs=[],
+                ThermalBCs=[],
+                ToolMotions=[],
+            )
+            for name in ("Upset", "Finish")
+        ]
+
+        with self.assertRaisesRegex(ValueError, "unique StepId"):
+            loadsteps_to_dict(SimpleNamespace(LoadSteps=steps))
+
     def test_drag_and_attach_command_grouping_export_identically(self):
         class StepObject:
             def __init__(self):

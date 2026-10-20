@@ -97,6 +97,9 @@ def make_load_step(doc, analysis, name="CTformLoadStep"):
     obj = doc.addObject("App::DocumentObjectGroupPython", name)
     obj.Label = "CTform Load Step"
     obj.Proxy = CTformLoadStep(obj)
+    case = _case_for_analysis(analysis)
+    steps = getattr(case, "LoadSteps", ()) if case is not None else ()
+    obj.StepId = max((getattr(step, "StepId", 0) for step in steps), default=0) + 1
     analysis.addObject(obj)
     _link_to_case(analysis, "LoadSteps", obj)
     return obj
@@ -105,9 +108,6 @@ def make_load_step(doc, analysis, name="CTformLoadStep"):
 def clone_load_step(doc, analysis, source_step):
     """Deep-copy a load step and its native condition children."""
     clone = make_load_step(doc, analysis)
-    case = _case_for_analysis(analysis)
-    steps = getattr(case, "LoadSteps", ()) if case is not None else ()
-    clone.StepId = max((getattr(step, "StepId", 0) for step in steps), default=0) + 1
     clone.StepName = f"{getattr(source_step, 'StepName', 'LoadStep')} Copy"
     clone.StartTime = getattr(source_step, "StartTime", 0.0)
     clone.EndTime = getattr(source_step, "EndTime", 1.0)
