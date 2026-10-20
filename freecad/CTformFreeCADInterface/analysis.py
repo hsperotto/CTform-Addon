@@ -121,6 +121,8 @@ class CTformSolver:
             ("ThermalFrictionEfficiency", "Thermal", 0.0),
             ("FrictionHeatPartitionToWorkpiece", "Thermal", 1.0),
             ("FrictionHeatLayerDepth", "Thermal", 0.5),
+            ("InitialWorkpieceTemperature", "Thermal", 293.15),
+            ("InitialToolTemperature", "Thermal", 293.15),
             ("TargetCompression", "Run", 7.0),
             ("InitialGap", "Contact", 0.05),
             ("PenetrationTolerance", "Contact", 1e-2),

@@ -11,7 +11,9 @@ from unittest.mock import patch
 from freecad.CTformFreeCADInterface.case_export import (
     case_to_dict,
     loadsteps_to_dict,
+    thermal_to_dict,
     write_case_json,
+    _core_v2_unsupported_issues,
 )
 from freecad.CTformFreeCADInterface.contacts import contact_pair_to_dict
 from freecad.CTformFreeCADInterface.components import CTformWorkpiece
@@ -844,6 +846,50 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(bc["type"], "HeatGeneration")
         self.assertEqual(bc["value"], 12.5)
         self.assertEqual(bc["target"], "All")
+
+    def test_thermal_exports_initial_temperature_from_solver(self):
+        solver = SimpleNamespace(
+            InitialWorkpieceTemperature=1423.15, InitialToolTemperature=473.15
+        )
+        with patch("freecad.CTformFreeCADInterface.case_export.find_solver", return_value=solver):
+            exported = thermal_to_dict(SimpleNamespace())
+
+        self.assertEqual(
+            exported["initialTemperature"], {"workpiece": 1423.15, "tools": 473.15}
+        )
+
+    def test_tool_motion_without_tool_id_resolves_it_from_tool_name(self):
+        tool = SimpleNamespace(ToolId="upper-punch", ToolName="UpperPunch", Label="UpperPunch")
+        motion = SimpleNamespace(ToolName="UpperPunch", Vz=-1.0)
+        step = SimpleNamespace(
+            StepId=1, StepName="Press", StartTime=0.0, EndTime=1.0, Increments=1,
+            MechanicalBCs=[], ThermalBCs=[], ToolMotions=[motion],
+        )
+
+        exported = loadsteps_to_dict(SimpleNamespace(LoadSteps=[step], Tools=[tool]))
+
+        self.assertEqual(exported["loadSteps"][0]["tools"][0]["toolId"], "upper-punch")
+
+    def test_readiness_reports_features_core_v2_rejects(self):
+        convection = SimpleNamespace(
+            TypeId="Fem::ConstraintHeatflux", Proxy=None, Label="Air", References=[]
+        )
+        step = SimpleNamespace(
+            StepId=1, MechanicalBCs=[], ThermalBCs=[convection], ToolMotions=[]
+        )
+        case = SimpleNamespace(LoadSteps=[step], Tools=[])
+        issues = _core_v2_unsupported_issues(
+            case,
+            {"elementTypes": ["Tri3", "Quad4"]},
+            {"materials": [{"name": "Steel", "constitutive": {"model": "TabulatedFlowStress"}}]},
+            SimpleNamespace(RemeshEnabled=True),
+        )
+
+        self.assertEqual(len(issues), 4)
+        self.assertTrue(any("Remesh" in issue for issue in issues))
+        self.assertTrue(any("Tri3 and Quad4" in issue for issue in issues))
+        self.assertTrue(any("TabulatedFlowStress" in issue for issue in issues))
+        self.assertTrue(any("Temperature thermal" in issue for issue in issues))
 
 
 if __name__ == "__main__":

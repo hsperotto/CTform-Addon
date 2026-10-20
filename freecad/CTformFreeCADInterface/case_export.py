@@ -55,6 +55,9 @@ def case_to_dict(
         )
     geometry = _geometry_from_components(case, geometry_info)
     material_catalog = materials_to_dict(case)
+    readiness_issues = _readiness_issues(
+        case, mesh_info, material_catalog, geometry_info, solver
+    )
     return {
         "schemaVersion": package_version,
         "units": dict(SI_UNITS),
@@ -100,10 +103,8 @@ def case_to_dict(
         "ale": {"enabled": _value(solver, "ALEEnabled", False)},
         "remesh": {"enabled": _value(solver, "RemeshEnabled", False)},
         "solver": {},
-        "packageStatus": "draft",
-        "readinessIssues": _readiness_issues(
-            case, mesh_info, material_catalog, geometry_info, solver
-        ),
+        "packageStatus": "ready" if not readiness_issues else "draft",
+        "readinessIssues": readiness_issues,
     }
 
 
@@ -209,7 +210,63 @@ def _readiness_issues(
         issues.append("Current geometry and mesh export supports 2D Solver configurations only.")
     if geometry_info is None and tools:
         issues.append("Export ASCII SI DXF profile files for the Tools.")
+    issues.extend(_core_v2_unsupported_issues(case, mesh_info, material_catalog, solver))
     return issues
+
+
+def _core_v2_unsupported_issues(
+    case: object,
+    mesh_info: dict[str, Any] | None,
+    material_catalog: dict[str, Any] | None,
+    solver: object | None,
+) -> list[str]:
+    """Report features that Core's v2 reader rejects with an error."""
+    issues = []
+    if solver is not None and _value(solver, "RemeshEnabled", False):
+        issues.append("Core v2 does not support remeshing yet; disable Remesh on the Solver.")
+    if "Tri3" in ((mesh_info or {}).get("elementTypes") or ()) and "Quad4" in (
+        (mesh_info or {}).get("elementTypes") or ()
+    ):
+        issues.append("Core v2 does not support meshes that mix Tri3 and Quad4 elements.")
+    for material in ((material_catalog or {}).get("materials") or ()):
+        if material.get("constitutive", {}).get("model") == "TabulatedFlowStress":
+            issues.append(
+                f"Material {material.get('name', '')!r}: Core v2 does not support TabulatedFlowStress."
+            )
+    steps = list(getattr(case, "LoadSteps", ()) or ())
+    for step in steps:
+        for condition in _step_conditions(step, "thermal", "ThermalBCs"):
+            _check_workpiece_thermal(condition, case, issues)
+        for condition in _step_conditions(step, "mechanical", "MechanicalBCs"):
+            _check_workpiece_force(condition, case, issues)
+    for condition in _root_conditions(case, "thermal"):
+        _check_workpiece_thermal(condition, case, issues)
+    for condition in _root_conditions(case, "mechanical"):
+        _check_workpiece_force(condition, case, issues)
+    return list(dict.fromkeys(issues))
+
+
+def _check_workpiece_thermal(condition: object, case: object, issues: list[str]) -> None:
+    if _condition_tool_data(condition, case) is not None:
+        return
+    type_name = _condition_type_name(condition)
+    legacy_type = getattr(condition, "Type", "")
+    if "temperature" in type_name or legacy_type == "Temperature":
+        return
+    issues.append(
+        f"Thermal condition {getattr(condition, 'Label', '')!r}: Core v2 only supports "
+        "Temperature thermal boundary conditions."
+    )
+
+
+def _check_workpiece_force(condition: object, case: object, issues: list[str]) -> None:
+    if _condition_tool_data(condition, case) is not None:
+        return
+    if "force" in _condition_type_name(condition) or getattr(condition, "Type", "") == "Force":
+        issues.append(
+            f"Force condition {getattr(condition, 'Label', '')!r}: Core v2 supports forces "
+            "only as force-controlled Tool motion."
+        )
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
@@ -236,8 +293,24 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         ),
         "frictionHeatLayerDepth": _length_to_si(_value(solver, "FrictionHeatLayerDepth", 0.5)),
         "frictionHeatDistribution": _value(solver, "FrictionHeatDistribution", "uniform"),
+        "initialTemperature": {
+            "workpiece": _value(solver, "InitialWorkpieceTemperature", 293.15),
+            "tools": _value(solver, "InitialToolTemperature", 293.15),
+        },
         "thermalBCs": thermal_bcs,
     }
+
+
+def _motion_tool_id(motion: object, case: object) -> str:
+    """Use the motion's ToolId, else look the tool up by ToolName."""
+    tool_id = str(getattr(motion, "ToolId", "") or "")
+    if tool_id:
+        return tool_id
+    name = getattr(motion, "ToolName", "")
+    for tool in getattr(case, "Tools", ()) or ():
+        if name and name in (getattr(tool, "ToolName", ""), getattr(tool, "Label", "")):
+            return str(getattr(tool, "ToolId", ""))
+    return ""
 
 
 def _duplicate_step_ids(steps) -> list[int]:
@@ -280,7 +353,7 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         tools = [
             {
                 "id": getattr(motion, "MotionId", 1000 + index),
-                "toolId": getattr(motion, "ToolId", ""),
+                "toolId": _motion_tool_id(motion, case),
                 "name": getattr(motion, "ToolName", ""),
                 "type": "Motion",
                 "vx": getattr(motion, "Vx", 0.0),

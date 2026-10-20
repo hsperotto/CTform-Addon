@@ -79,6 +79,7 @@ class CTformToolMotion:
     def __init__(self, obj):
         self.Object = obj
         _add(obj, "MotionId", "App::PropertyInteger", "Tool Motion", 1000)
+        _add(obj, "ToolId", "App::PropertyString", "Tool Motion", "")
         _add(obj, "ToolName", "App::PropertyString", "Tool Motion", "")
         _add(obj, "Vx", "App::PropertyFloat", "Tool Motion", 0.0)
         _add(obj, "Vy", "App::PropertyFloat", "Tool Motion", 0.0)
