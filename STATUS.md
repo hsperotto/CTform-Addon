@@ -14,11 +14,17 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   `packageStatus` is `ready` when no issues remain.
 - Tools have a `Role` (auto/upper/lower); upper/lower is exported as
   `geometry.tools[].role`, auto lets Core infer it from the DXF position.
-- 52 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- Native thermal BCs follow Core v2 (Core `a462978`): FreeCAD Heat Flux
+  exports by ConstraintType (DFlux -> HeatFlux, Convection, Radiation); body
+  heat source Dissipation Rate (W/kg) x workpiece density -> HeatGeneration
+  W/m^3. CFlux and Total Power are rejected. Workpiece Force BCs are exported
+  (flow formulation only); zero force components are dropped.
+- 55 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
-- Nothing.
+- Coordinating with the Core session; shared notes on Core branch
+  `agent/addon-sync` (`ADDON-SYNC.md`).
 
 ## Next
 1. Fresh interactive run of `MANUAL-SMOKE-TEST.md` in FreeCAD; renumber old
@@ -29,8 +35,5 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 5. Minimal solver run command (invoke `ctform3_cli`, pass `--tune` options).
 
 ## Blocked
-- Mapping convection/radiation/heat flux to Core: Core v2 accepts only
-  Temperature thermal BCs (no area/volume weighting yet). Export reports them
-  as readiness issues meanwhile.
 - Running cases with Core `master`: the v2 reader and the `-ffast-math` tool
   motion fix exist only on Core `agent/*` branches.

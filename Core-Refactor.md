@@ -410,3 +410,18 @@ meshes, and `TabulatedFlowStress`. 3D is already reported; deformable tools are
 not authorable in the addon.
 - **Open on the Core side:** drop `-ffast-math` or add `-fno-finite-math-only`
 (fixed on its branch); Gmsh DLL hang at process exit (~1 in 27 runs).
+
+### 2026-10-20: Core v2 thermal BCs, TabulatedFlowStress, workpiece Force
+
+- **Core (`agent/v2-thermal-bcs` a462978):** accepts Convection, HeatFlux and
+Radiation (area-weighted; SI W/m^2, W/m^2/K, emissivity, ambient K),
+HeatGeneration in W/m^3, `TabulatedFlowStress` (`flowStressTable` Pa), and
+workpiece Force BCs (total N on the group, axis X or Z, flow formulation only).
+- **Addon:** native `Fem::ConstraintHeatflux` is mapped by `ConstraintType`
+using `DFlux`, `FilmCoef`, `AmbientTemp`, `Emissivity` (before this, convection
+and radiation were exported as HeatFlux with value 0). Body heat source
+Dissipation Rate (W/kg) is multiplied by the workpiece density; Total Power and
+Temperature `CFlux` have no Core equivalent and are rejected. The
+non-Temperature, Force and TabulatedFlowStress readiness issues were removed.
+- **Open in Core:** a force-controlled punch (`motion.type=force`) moved 7.8 mm
+in one increment with zero ring contact force.
