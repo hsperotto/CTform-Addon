@@ -401,6 +401,9 @@ warning; runs when `readinessIssues` is empty.
 `InitialToolTemperature` (K) are exported as `thermal.initialTemperature`;
 Tool Motion records resolve `toolId` (new `ToolId` property, else by tool name);
 `packageStatus` is `ready` when there are no readiness issues.
+- **Tool role:** Tool folders have `Role` (auto/upper/lower); an explicit value
+is exported as `geometry.tools[].role`, `auto` omits it so Core infers it from
+DXF position.
 - **Readiness issues now report what Core v2 rejects:** non-Temperature
 workpiece thermal BCs, workpiece Force BCs, `remesh.enabled`, mixed Tri3/Quad4
 meshes, and `TabulatedFlowStress`. 3D is already reported; deformable tools are

@@ -1015,6 +1015,9 @@ def _geometry_from_components(
             ),
             "materialId": material_id,
         }
+        role = str(getattr(tool_component, "Role", "auto"))
+        if role in ("upper", "lower"):
+            tool["role"] = role
         tool["toolLayer"] = getattr(tool_component, "ToolLayer", "") or "ToolProfile"
         tool["initialOffsetZ"] = _length_to_si(getattr(tool_component, "InitialOffsetZ", 0.0))
         tool["symmetryR"] = _length_to_si(getattr(tool_component, "SymmetryR", 0.0))

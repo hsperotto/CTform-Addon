@@ -12,7 +12,9 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - Initial temperatures live on the Solver (`thermal.initialTemperature`);
   tool motions export `toolId`; readiness lists features Core v2 rejects;
   `packageStatus` is `ready` when no issues remain.
-- 51 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- Tools have a `Role` (auto/upper/lower); upper/lower is exported as
+  `geometry.tools[].role`, auto lets Core infer it from the DXF position.
+- 52 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress

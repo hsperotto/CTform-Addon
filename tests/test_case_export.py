@@ -14,6 +14,7 @@ from freecad.CTformFreeCADInterface.case_export import (
     thermal_to_dict,
     write_case_json,
     _core_v2_unsupported_issues,
+    _geometry_from_components,
 )
 from freecad.CTformFreeCADInterface.contacts import contact_pair_to_dict
 from freecad.CTformFreeCADInterface.components import CTformWorkpiece
@@ -846,6 +847,23 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(bc["type"], "HeatGeneration")
         self.assertEqual(bc["value"], 12.5)
         self.assertEqual(bc["target"], "All")
+
+    def test_tool_role_is_exported_only_when_set(self):
+        def tool(tool_id, role):
+            return SimpleNamespace(
+                ToolId=tool_id, ToolName=tool_id, Label=tool_id, Role=role,
+                Material=None, ToolLayer="ToolProfile", InitialOffsetZ=0.0, SymmetryR=0.0,
+            )
+
+        case = SimpleNamespace(
+            Workpiece=None, Tools=[tool("punch", "upper"), tool("die", "lower"), tool("aux", "auto")]
+        )
+
+        tools = {item["id"]: item for item in _geometry_from_components(case)["tools"]}
+
+        self.assertEqual(tools["punch"]["role"], "upper")
+        self.assertEqual(tools["die"]["role"], "lower")
+        self.assertNotIn("role", tools["aux"])
 
     def test_thermal_exports_initial_temperature_from_solver(self):
         solver = SimpleNamespace(

@@ -58,6 +58,10 @@ class CTformTool:
         _add(obj, "Shape", "App::PropertyLink", "Component", None)
         _add(obj, "Mesh", "App::PropertyLink", "Component", None)
         _add(obj, "Material", "App::PropertyLink", "Component", None)
+        if "Role" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyEnumeration", "Role", "Export")
+            obj.Role = ["auto", "upper", "lower"]
+            obj.Role = "auto"
         _add(obj, "ToolLayer", "App::PropertyString", "Export", "ToolProfile")
         _add(obj, "InitialOffsetZ", "App::PropertyFloat", "Export", 0.0)
         _add(obj, "SymmetryR", "App::PropertyFloat", "Export", 0.0)
