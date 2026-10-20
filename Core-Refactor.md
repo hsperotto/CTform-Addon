@@ -424,7 +424,8 @@ Dissipation Rate (W/kg) is multiplied by the workpiece density; Total Power and
 Temperature `CFlux` have no Core equivalent and are rejected. The
 non-Temperature, Force and TabulatedFlowStress readiness issues were removed.
 - **Core still rejects:** `remesh.enabled`, mixed Tri3/Quad4, 3D, deformable
-tools, and `motion.type=force` on a lower tool; readiness reports these. Core
+tools, and `motion.type=force` on a lower tool; readiness reports these and requires
+an explicit `upper` Role on force-driven tools. Core
 also requires a complete `flowStressTable` grid, which readiness checks.
 - **Merge order:** addon `agent/core-thermal-force-sync` after Core
 `agent/v2-thermal-bcs` reaches Core `master`.

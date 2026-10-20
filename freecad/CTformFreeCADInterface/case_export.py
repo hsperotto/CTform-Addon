@@ -282,10 +282,11 @@ def _check_workpiece_force(
              if str(getattr(item, "ToolId", "")) == tool_data["id"]),
             None,
         )
-        if str(getattr(tool, "Role", "auto")) == "lower":
+        # With "auto", Core infers the role and would reject a lower tool only at load time.
+        if str(getattr(tool, "Role", "auto")) != "upper":
             issues.append(
-                f"Force condition {getattr(condition, 'Label', '')!r}: Core v2 force-controlled "
-                f"motion only works on an upper tool, not {tool_data['name']!r}."
+                f"Force condition {getattr(condition, 'Label', '')!r}: set Role to 'upper' on "
+                f"Tool {tool_data['name']!r}; Core v2 force-controlled motion only works on an upper tool."
             )
         return
     if str(_value(solver, "MechanicalFormulation", "flow")) != "flow":

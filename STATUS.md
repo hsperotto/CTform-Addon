@@ -20,8 +20,8 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   W/m^3. CFlux and Total Power are rejected. Workpiece Force BCs are exported
   (flow formulation only); zero force components are dropped.
 - Readiness also checks that a TabulatedFlowStress table is a complete
-  T x rate x strain grid, and that force-controlled motion is not on a Tool
-  with Role `lower` (Core's servo only pushes toward -Z).
+  T x rate x strain grid, and that force-controlled motion is on a Tool
+  with Role `upper` (Core's servo only pushes toward -Z; `auto` is not enough).
 - 57 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 

@@ -949,12 +949,15 @@ class CaseExportTests(unittest.TestCase):
         )
         step = SimpleNamespace(StepId=1, MechanicalBCs=[force], ThermalBCs=[], ToolMotions=[])
 
-        issues = _core_v2_unsupported_issues(
-            SimpleNamespace(LoadSteps=[step], Tools=[die]), {}, {}, SimpleNamespace()
-        )
+        def issues_for(role):
+            die.Role = role
+            return _core_v2_unsupported_issues(
+                SimpleNamespace(LoadSteps=[step], Tools=[die]), {}, {}, SimpleNamespace()
+            )
 
-        self.assertEqual(len(issues), 1)
-        self.assertIn("upper tool", issues[0])
+        self.assertEqual(len(issues_for("lower")), 1)
+        self.assertIn("upper tool", issues_for("auto")[0])
+        self.assertEqual(issues_for("upper"), [])
 
     def _thermal_step(self, condition):
         return SimpleNamespace(
