@@ -423,5 +423,10 @@ and radiation were exported as HeatFlux with value 0). Body heat source
 Dissipation Rate (W/kg) is multiplied by the workpiece density; Total Power and
 Temperature `CFlux` have no Core equivalent and are rejected. The
 non-Temperature, Force and TabulatedFlowStress readiness issues were removed.
+- **Core still rejects:** `remesh.enabled`, mixed Tri3/Quad4, 3D, deformable
+tools, and `motion.type=force` on a lower tool; readiness reports these. Core
+also requires a complete `flowStressTable` grid, which readiness checks.
+- **Merge order:** addon `agent/core-thermal-force-sync` after Core
+`agent/v2-thermal-bcs` reaches Core `master`.
 - **Open in Core:** a force-controlled punch (`motion.type=force`) moved 7.8 mm
 in one increment with zero ring contact force.

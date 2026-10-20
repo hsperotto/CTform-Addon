@@ -272,9 +272,21 @@ def _check_workpiece_thermal(condition: object, case: object, issues: list[str])
 def _check_workpiece_force(
     condition: object, case: object, solver: object | None, issues: list[str]
 ) -> None:
-    if _condition_tool_data(condition, case) is not None:
-        return
     if "force" not in _condition_type_name(condition) and getattr(condition, "Type", "") != "Force":
+        return
+    tool_data = _condition_tool_data(condition, case)
+    if tool_data is not None:
+        # Core's force servo only pushes toward -Z, so it cannot drive a lower tool.
+        tool = next(
+            (item for item in getattr(case, "Tools", ()) or ()
+             if str(getattr(item, "ToolId", "")) == tool_data["id"]),
+            None,
+        )
+        if str(getattr(tool, "Role", "auto")) == "lower":
+            issues.append(
+                f"Force condition {getattr(condition, 'Label', '')!r}: Core v2 force-controlled "
+                f"motion only works on an upper tool, not {tool_data['name']!r}."
+            )
         return
     if str(_value(solver, "MechanicalFormulation", "flow")) != "flow":
         issues.append(

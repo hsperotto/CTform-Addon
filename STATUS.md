@@ -19,12 +19,17 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   heat source Dissipation Rate (W/kg) x workpiece density -> HeatGeneration
   W/m^3. CFlux and Total Power are rejected. Workpiece Force BCs are exported
   (flow formulation only); zero force components are dropped.
-- 55 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- Readiness also checks that a TabulatedFlowStress table is a complete
+  T x rate x strain grid, and that force-controlled motion is not on a Tool
+  with Role `lower` (Core's servo only pushes toward -Z).
+- 57 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
-- Coordinating with the Core session; shared notes on Core branch
-  `agent/addon-sync` (`ADDON-SYNC.md`).
+- Branch `agent/core-thermal-force-sync` (this work) must merge into addon
+  `main` only after Core `agent/v2-thermal-bcs` is merged into Core `master`.
+  Core `master` still rejects these thermal BCs, workpiece forces and
+  TabulatedFlowStress, and refuses packages with readiness issues.
 
 ## Next
 1. Fresh interactive run of `MANUAL-SMOKE-TEST.md` in FreeCAD; renumber old

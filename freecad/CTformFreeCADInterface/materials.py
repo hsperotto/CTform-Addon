@@ -329,6 +329,13 @@ def material_readiness_issues(catalog: dict[str, Any]) -> list[str]:
             issues.append(f"Material {name!r} needs a positive flow-stress K coefficient.")
         elif model == "TabulatedFlowStress" and not material.get("flowStressTable"):
             issues.append(f"Material {name!r} needs a non-empty flow-stress table.")
+        elif model == "TabulatedFlowStress" and not _is_complete_flow_stress_grid(
+            material["flowStressTable"]
+        ):
+            issues.append(
+                f"Material {name!r}: the flow-stress table must list every temperature x "
+                "strain rate x strain combination exactly once."
+            )
         if elastic.get("youngModulus", 0.0) <= 0.0:
             issues.append(f"Material {name!r} needs a positive Young's modulus.")
         poisson_ratio = elastic.get("poissonRatio", 0.3)
@@ -337,6 +344,19 @@ def material_readiness_issues(catalog: dict[str, Any]) -> list[str]:
         if thermal.get("density", 0.0) <= 0.0:
             issues.append(f"Material {name!r} needs a positive density.")
     return issues
+
+
+def _is_complete_flow_stress_grid(table) -> bool:
+    """Core interpolates on a rectilinear T x rate x strain grid with no gaps or repeats."""
+    try:
+        keys = [
+            (float(point["temperature"]), float(point["strainRate"]), float(point["strain"]))
+            for point in table
+        ]
+    except (KeyError, TypeError, ValueError):
+        return False
+    axes = [len({key[index] for key in keys}) for index in range(3)]
+    return len(set(keys)) == len(keys) == axes[0] * axes[1] * axes[2]
 
 
 def _constitutive_parameters(material: object, model: str) -> dict[str, float]:

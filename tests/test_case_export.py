@@ -926,6 +926,36 @@ class CaseExportTests(unittest.TestCase):
         self.assertTrue(any("Total Power" in issue for issue in issues))
         self.assertTrue(any("flow formulation" in issue for issue in issues))
 
+    def test_flow_stress_table_must_be_a_complete_grid(self):
+        from freecad.CTformFreeCADInterface.materials import _is_complete_flow_stress_grid
+
+        grid = [
+            {"temperature": t, "strainRate": r, "strain": e, "stress": 1e8}
+            for t in (1173.0, 1273.0) for r in (0.1, 1.0) for e in (0.0, 0.5)
+        ]
+
+        self.assertTrue(_is_complete_flow_stress_grid(grid))
+        self.assertFalse(_is_complete_flow_stress_grid(grid[:-1]))
+        self.assertFalse(_is_complete_flow_stress_grid(grid + grid[:1]))
+
+    def test_force_motion_on_lower_tool_is_a_readiness_issue(self):
+        die_profile = SimpleNamespace()
+        force = SimpleNamespace(
+            TypeId="Fem::ConstraintForce", Proxy=None, Label="Die force",
+            References=[(die_profile, ["Edge1"])],
+        )
+        die = SimpleNamespace(
+            Shape=die_profile, ToolId="die", ToolName="Die", Label="Die", Role="lower"
+        )
+        step = SimpleNamespace(StepId=1, MechanicalBCs=[force], ThermalBCs=[], ToolMotions=[])
+
+        issues = _core_v2_unsupported_issues(
+            SimpleNamespace(LoadSteps=[step], Tools=[die]), {}, {}, SimpleNamespace()
+        )
+
+        self.assertEqual(len(issues), 1)
+        self.assertIn("upper tool", issues[0])
+
     def _thermal_step(self, condition):
         return SimpleNamespace(
             StepId=1, StepName="Heat", StartTime=0.0, EndTime=1.0, Increments=1,
