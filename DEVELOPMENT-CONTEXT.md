@@ -121,7 +121,7 @@ No FEM solver commands are exposed in CTform menus.
 
 ## Current validation
 
-The addon currently has 48 passing Python tests. Python compilation and diagnostics
+The addon currently has 48 passing Python tests (`python -m unittest discover -s tests`). Python compilation and diagnostics
 also pass. FreeCAD 1.1 runtime probes have verified component-tree save/reopen,
 shared material catalog import with unit-aware values, nested Workpiece Gmsh
 MSH2 export in `From Shape` mode, and native FEM Force `DirectionVector` mapping.
@@ -156,9 +156,12 @@ interactive run.
    converted from MPa to Pa and its Celsius temperature factor is shifted to Kelvin.
    Elastic and thermal values are illustrative estimates, not production
    calibration.
-- **SmokeTest package issues to revisit:** `SmokeTest/loadsteps.json` repeats
-   step ID 1 and tool-record ID 1000 for both die and punch in each step. The
-   current Core reader does not implement the addon v2 contract, so keep the
+- **Resolved (2026-10-20):** `SmokeTest/loadsteps.json` repeated step ID 1 and
+   tool-record ID 1000. `make_load_step` now assigns the next StepId, export
+   rejects duplicate StepIds (readiness reports them), and tool records are
+   renumbered 1000.. per step. Existing documents with duplicate StepIds must be
+   renumbered by hand, then SmokeTest re-exported.
+- **SmokeTest package issues to revisit:** The current Core reader does not implement the addon v2 contract, so keep the
    package marked draft and do not run it as a certified case. Its two full-face
    Temperature BCs (600 K then 450 K) are maintained constraints, not initial
    states; confirm that is intended for the smoke scenario.
