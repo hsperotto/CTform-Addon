@@ -2,7 +2,7 @@
 
 **Purpose:** Working contract for AI agents and developers refactoring CTform Core to consume cases authored by the CTform FreeCAD Interface. This is a living document. Add evidence-backed assumptions, decisions, blockers, and resolutions here whenever they arise.
 
-**Core source:** `C:\Users\henri\Desktop\TCC\CTForm`
+**Core source:** `C:\Users\henri\Desktop\TCC\Receba\CTForm` (work is on `agent/*` branches; latest `agent/v2-thermal-bcs`)
 
 **Addon source:** `freecad/CTformFreeCADInterface/`
 
@@ -390,3 +390,20 @@ this addon-only stage; v2 packages are marked draft and must not be run yet.
 - **Remaining addon blocker:** complete geometry/material/contact preflight,
 semantic workpiece layer mapping for arbitrary topology, and validation of
 tool placement/offset interaction before a case can be marked runnable.
+
+### 2026-10-20: Core v2 reader alignment
+
+- **Core (agent/v2-thermal-bcs):** reads v2 packages; step tools match by
+`toolId` (name fallback with a warning); optional
+`thermal.initialTemperature {workpiece, tools}` in K, otherwise 293.15 K with a
+warning; runs when `readinessIssues` is empty.
+- **Addon changes:** Solver properties `InitialWorkpieceTemperature` and
+`InitialToolTemperature` (K) are exported as `thermal.initialTemperature`;
+Tool Motion records resolve `toolId` (new `ToolId` property, else by tool name);
+`packageStatus` is `ready` when there are no readiness issues.
+- **Readiness issues now report what Core v2 rejects:** non-Temperature
+workpiece thermal BCs, workpiece Force BCs, `remesh.enabled`, mixed Tri3/Quad4
+meshes, and `TabulatedFlowStress`. 3D is already reported; deformable tools are
+not authorable in the addon.
+- **Open on the Core side:** drop `-ffast-math` or add `-fno-finite-math-only`
+(fixed on its branch); Gmsh DLL hang at process exit (~1 in 27 runs).

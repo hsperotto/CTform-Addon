@@ -9,7 +9,10 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   `loadsteps.json`, MSH2, ASCII DXF).
 - New load steps get unique StepIds; export rejects duplicate StepIds and the
   readiness check reports them. Tool records are numbered uniquely per step.
-- 48 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- Initial temperatures live on the Solver (`thermal.initialTemperature`);
+  tool motions export `toolId`; readiness lists features Core v2 rejects;
+  `packageStatus` is `ready` when no issues remain.
+- 51 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
