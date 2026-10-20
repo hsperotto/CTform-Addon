@@ -795,11 +795,11 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(exported["thermalBCs"][0]["type"], "Temperature")
         self.assertEqual(exported["thermalBCs"][0]["value"], 650.0)
 
-    def test_native_workpiece_force_is_rejected(self):
+    def test_native_workpiece_force_exports_as_force_bc(self):
         condition = SimpleNamespace(
             TypeId="Fem::ConstraintForce",
             Proxy=None,
-            Label="Unsupported workpiece force",
+            Label="Workpiece force",
             References=[],
             Force=500.0,
             Direction=SimpleNamespace(x=0.0, y=1.0, z=0.0),
@@ -816,8 +816,11 @@ class CaseExportTests(unittest.TestCase):
             ToolMotions=[],
         )
 
-        with self.assertRaisesRegex(ValueError, "force conditions only as force-controlled tool motion"):
-            loadsteps_to_dict(SimpleNamespace(LoadSteps=[step]))
+        exported = loadsteps_to_dict(SimpleNamespace(LoadSteps=[step]))["loadSteps"][0]
+
+        self.assertEqual(exported["mechanicalBCs"][0]["type"], "Force")
+        self.assertEqual(exported["mechanicalBCs"][0]["axis"], "Z")
+        self.assertEqual(exported["mechanicalBCs"][0]["value"], 500.0)
 
     def test_native_body_heat_source_maps_to_heat_generation(self):
         profile = SimpleNamespace(Shape=SimpleNamespace())
@@ -889,25 +892,98 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(exported["loadSteps"][0]["tools"][0]["toolId"], "upper-punch")
 
     def test_readiness_reports_features_core_v2_rejects(self):
+        cflux = SimpleNamespace(
+            TypeId="Fem::ConstraintTemperature", Proxy=None, Label="Point flux",
+            References=[], ConstraintType="CFlux",
+        )
         convection = SimpleNamespace(
-            TypeId="Fem::ConstraintHeatflux", Proxy=None, Label="Air", References=[]
+            TypeId="Fem::ConstraintHeatflux", Proxy=None, Label="Air",
+            References=[], ConstraintType="Convection",
+        )
+        power = SimpleNamespace(
+            TypeId="Fem::ConstraintPython",
+            Proxy=type("ConstraintBodyHeatSource", (), {})(),
+            Label="Heater", References=[], Mode="Total Power",
+        )
+        force = SimpleNamespace(
+            TypeId="Fem::ConstraintForce", Proxy=None, Label="Push", References=[]
         )
         step = SimpleNamespace(
-            StepId=1, MechanicalBCs=[], ThermalBCs=[convection], ToolMotions=[]
+            StepId=1, MechanicalBCs=[force], ThermalBCs=[cflux, convection, power], ToolMotions=[]
         )
         case = SimpleNamespace(LoadSteps=[step], Tools=[])
         issues = _core_v2_unsupported_issues(
             case,
             {"elementTypes": ["Tri3", "Quad4"]},
             {"materials": [{"name": "Steel", "constitutive": {"model": "TabulatedFlowStress"}}]},
-            SimpleNamespace(RemeshEnabled=True),
+            SimpleNamespace(RemeshEnabled=True, MechanicalFormulation="displacement"),
         )
 
-        self.assertEqual(len(issues), 4)
+        self.assertEqual(len(issues), 5)
         self.assertTrue(any("Remesh" in issue for issue in issues))
         self.assertTrue(any("Tri3 and Quad4" in issue for issue in issues))
-        self.assertTrue(any("TabulatedFlowStress" in issue for issue in issues))
-        self.assertTrue(any("Temperature thermal" in issue for issue in issues))
+        self.assertTrue(any("CFlux" in issue for issue in issues))
+        self.assertTrue(any("Total Power" in issue for issue in issues))
+        self.assertTrue(any("flow formulation" in issue for issue in issues))
+
+    def _thermal_step(self, condition):
+        return SimpleNamespace(
+            StepId=1, StepName="Heat", StartTime=0.0, EndTime=1.0, Increments=1,
+            MechanicalBCs=[], ThermalBCs=[condition], ToolMotions=[],
+        )
+
+    def test_native_heatflux_types_map_to_core_thermal_bcs(self):
+        def heatflux(constraint_type, **values):
+            return SimpleNamespace(
+                TypeId="Fem::ConstraintHeatflux", Proxy=None, Label=constraint_type,
+                References=[], ConstraintType=constraint_type, Active=True, **values,
+            )
+
+        cases = {
+            "DFlux": heatflux("DFlux", DFlux=2500.0),
+            "Convection": heatflux("Convection", FilmCoef=100.0, AmbientTemp=300.0),
+            "Radiation": heatflux("Radiation", Emissivity=0.8, AmbientTemp=310.0),
+        }
+        bcs = {
+            name: loadsteps_to_dict(
+                SimpleNamespace(LoadSteps=[self._thermal_step(condition)])
+            )["loadSteps"][0]["thermalBCs"][0]
+            for name, condition in cases.items()
+        }
+
+        self.assertEqual((bcs["DFlux"]["type"], bcs["DFlux"]["value"]), ("HeatFlux", 2500.0))
+        self.assertEqual(bcs["Convection"]["type"], "Convection")
+        self.assertEqual(bcs["Convection"]["filmCoefficient"], 100.0)
+        self.assertEqual(bcs["Convection"]["ambientTemperature"], 300.0)
+        self.assertEqual(bcs["Radiation"]["type"], "Radiation")
+        self.assertEqual(bcs["Radiation"]["emissivity"], 0.8)
+        self.assertEqual(bcs["Radiation"]["ambientTemperature"], 310.0)
+
+    def test_body_heat_dissipation_rate_converts_with_workpiece_density(self):
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintPython",
+            Proxy=type("ConstraintBodyHeatSource", (), {})(),
+            Label="Heater", References=[], Mode="Dissipation Rate",
+            DissipationRate=2.0, Active=True,
+        )
+        case = SimpleNamespace(
+            LoadSteps=[self._thermal_step(condition)],
+            Workpiece=SimpleNamespace(Material=SimpleNamespace(Density=7850.0)),
+        )
+
+        bc = loadsteps_to_dict(case)["loadSteps"][0]["thermalBCs"][0]
+
+        self.assertEqual(bc["type"], "HeatGeneration")
+        self.assertEqual(bc["value"], 15700.0)
+
+    def test_temperature_cflux_is_rejected(self):
+        condition = SimpleNamespace(
+            TypeId="Fem::ConstraintTemperature", Proxy=None, Label="Point flux",
+            References=[], ConstraintType="CFlux", CFlux=5.0, Active=True,
+        )
+
+        with self.assertRaisesRegex(ValueError, "CFlux"):
+            loadsteps_to_dict(SimpleNamespace(LoadSteps=[self._thermal_step(condition)]))
 
 
 if __name__ == "__main__":

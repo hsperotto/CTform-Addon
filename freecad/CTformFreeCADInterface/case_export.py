@@ -228,44 +228,58 @@ def _core_v2_unsupported_issues(
         (mesh_info or {}).get("elementTypes") or ()
     ):
         issues.append("Core v2 does not support meshes that mix Tri3 and Quad4 elements.")
-    for material in ((material_catalog or {}).get("materials") or ()):
-        if material.get("constitutive", {}).get("model") == "TabulatedFlowStress":
-            issues.append(
-                f"Material {material.get('name', '')!r}: Core v2 does not support TabulatedFlowStress."
-            )
     steps = list(getattr(case, "LoadSteps", ()) or ())
     for step in steps:
         for condition in _step_conditions(step, "thermal", "ThermalBCs"):
             _check_workpiece_thermal(condition, case, issues)
         for condition in _step_conditions(step, "mechanical", "MechanicalBCs"):
-            _check_workpiece_force(condition, case, issues)
+            _check_workpiece_force(condition, case, solver, issues)
     for condition in _root_conditions(case, "thermal"):
         _check_workpiece_thermal(condition, case, issues)
     for condition in _root_conditions(case, "mechanical"):
-        _check_workpiece_force(condition, case, issues)
+        _check_workpiece_force(condition, case, solver, issues)
     return list(dict.fromkeys(issues))
+
+
+def _workpiece_density(case: object) -> float | None:
+    material = getattr(getattr(case, "Workpiece", None), "Material", None)
+    density = _first_numeric_value(material, ("Density",), 0.0, "kg/m^3") if material else 0.0
+    return density if density > 0.0 else None
 
 
 def _check_workpiece_thermal(condition: object, case: object, issues: list[str]) -> None:
     if _condition_tool_data(condition, case) is not None:
         return
     type_name = _condition_type_name(condition)
-    legacy_type = getattr(condition, "Type", "")
-    if "temperature" in type_name or legacy_type == "Temperature":
-        return
-    issues.append(
-        f"Thermal condition {getattr(condition, 'Label', '')!r}: Core v2 only supports "
-        "Temperature thermal boundary conditions."
-    )
+    native_type = str(getattr(condition, "ConstraintType", ""))
+    label = getattr(condition, "Label", "")
+    if "temperature" in type_name and native_type == "CFlux":
+        issues.append(
+            f"Thermal condition {label!r}: Core v2 does not support concentrated heat flux (CFlux)."
+        )
+    if "bodyheatsource" in type_name:
+        mode = str(getattr(condition, "Mode", ""))
+        if mode == "Total Power":
+            issues.append(
+                f"Body heat source {label!r}: use Dissipation Rate; Core v2 needs W/m^3, not Total Power."
+            )
+        elif mode == "Dissipation Rate" and _workpiece_density(case) is None:
+            issues.append(
+                f"Body heat source {label!r}: the Workpiece material needs a density to convert W/kg."
+            )
 
 
-def _check_workpiece_force(condition: object, case: object, issues: list[str]) -> None:
+def _check_workpiece_force(
+    condition: object, case: object, solver: object | None, issues: list[str]
+) -> None:
     if _condition_tool_data(condition, case) is not None:
         return
-    if "force" in _condition_type_name(condition) or getattr(condition, "Type", "") == "Force":
+    if "force" not in _condition_type_name(condition) and getattr(condition, "Type", "") != "Force":
+        return
+    if str(_value(solver, "MechanicalFormulation", "flow")) != "flow":
         issues.append(
-            f"Force condition {getattr(condition, 'Label', '')!r}: Core v2 supports forces "
-            "only as force-controlled Tool motion."
+            f"Force condition {getattr(condition, 'Label', '')!r}: Core v2 applies workpiece "
+            "forces only with the flow formulation."
         )
 
 
@@ -283,7 +297,8 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
             continue
         thermal_bcs.extend(
             _condition_to_dict(condition, index + 1, thermal=True,
-                               physical_groups=physical_groups, scope="global")
+                               physical_groups=physical_groups, scope="global",
+                               density=_workpiece_density(case))
         )
     return {
         "thermalPlasticEfficiency": _value(solver, "ThermalPlasticEfficiency", 0.9),
@@ -368,10 +383,6 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         for index, condition in enumerate(root_mechanical):
             tool_data = _condition_tool_data(condition, case)
             tool_name = tool_data["name"] if tool_data else ""
-            if not tool_name and "constraintforce" in _condition_type_name(condition):
-                raise ValueError(
-                    "CTform currently supports FEM force conditions only as force-controlled tool motion"
-                )
             if tool_name:
                 tools.append(
                     _tool_motion_to_dict(
@@ -379,10 +390,6 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
                     )
                 )
             else:
-                if "constraintforce" in _condition_type_name(condition):
-                    raise ValueError(
-                        "CTform currently supports FEM force conditions only as force-controlled tool motion"
-                    )
                 mechanical_bcs.extend(
                     _condition_to_dict(
                         condition,
@@ -395,10 +402,6 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         for index, condition in enumerate(local_mechanical):
             tool_data = _condition_tool_data(condition, case)
             tool_name = tool_data["name"] if tool_data else ""
-            if not tool_name and "constraintforce" in _condition_type_name(condition):
-                raise ValueError(
-                    "CTform currently supports FEM force conditions only as force-controlled tool motion"
-                )
             if tool_name:
                 tool_record = _tool_motion_to_dict(
                     condition, tool_name, step, 1000 + index, "step", tool_data["id"]
@@ -444,6 +447,7 @@ def loadsteps_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
                     thermal=True,
                     physical_groups=physical_groups,
                     scope="step",
+                    density=_workpiece_density(case),
                 )
             )
         warnings.extend(_condition_override_warnings(
@@ -633,23 +637,53 @@ def _condition_to_dict(
     thermal: bool,
     physical_groups=None,
     scope: str | None = None,
+    density: float | None = None,
 ) -> list[dict[str, Any]]:
-    """Adapt supported CTform or native FEM conditions to CTform JSON."""
+    """Adapt supported CTform or native FEM conditions to CTform JSON.
+
+    ``density`` (kg/m^3) converts a native body heat source given in W/kg to
+    Core's W/m^3; without it the W/kg value is kept, which only target/DOF
+    comparisons may rely on.
+    """
     type_name = _condition_type_name(condition)
     targets = _condition_target_data(condition, physical_groups)
     if thermal:
+        native_type = str(getattr(condition, "ConstraintType", ""))
         if "temperature" in type_name or getattr(condition, "Type", "") == "Temperature":
+            if native_type == "CFlux":
+                raise ValueError(
+                    f"Temperature condition {getattr(condition, 'Label', '')!r} uses CFlux "
+                    "(concentrated heat flux), which CTform Core does not support; "
+                    "use a Heat Flux condition instead"
+                )
             condition_type = "Temperature"
             value_names = ("Temperature", "Value")
             value_unit = "K"
-        elif "heatflux" in type_name or "heat_flux" in type_name or getattr(condition, "Type", "") == "HeatFlux":
+        elif (
+            "heatflux" in type_name or "heat_flux" in type_name
+            or getattr(condition, "Type", "") == "HeatFlux"
+        ) and native_type in ("", "DFlux"):
             condition_type = "HeatFlux"
-            value_names = ("HeatFlux", "Value")
+            value_names = ("DFlux", "HeatFlux", "Value")
             value_unit = "W/m^2"
+        elif "heatflux" in type_name and native_type == "Convection":
+            condition_type = "Convection"
+            value_names = ()
+            value_unit = None
+        elif "heatflux" in type_name and native_type == "Radiation":
+            condition_type = "Radiation"
+            value_names = ()
+            value_unit = None
         elif "bodyheatsource" in type_name or getattr(condition, "Type", "") == "HeatGeneration":
             condition_type = "HeatGeneration"
             value_names = ("HeatSource", "HeatGeneration", "Value")
             value_unit = "W/m^3"
+            mode = str(getattr(condition, "Mode", ""))
+            if mode == "Total Power":
+                raise ValueError(
+                    f"Body heat source {getattr(condition, 'Label', '')!r} uses Total Power; "
+                    "CTform Core needs a volumetric rate, so switch it to Dissipation Rate"
+                )
         elif "radiation" in type_name:
             condition_type = "Radiation"
             value_names = ("Value",)
@@ -660,7 +694,11 @@ def _condition_to_dict(
             value_unit = None
         else:
             raise ValueError(f"Unsupported FEM thermal condition: {type_name}")
-        axes = [("All", _first_numeric_value(condition, value_names, 0.0, value_unit))]
+        value = _first_numeric_value(condition, value_names, 0.0, value_unit)
+        if condition_type == "HeatGeneration" and str(getattr(condition, "Mode", "")) == "Dissipation Rate":
+            rate = _first_numeric_value(condition, ("DissipationRate",), 0.0, "W/kg")
+            value = rate * density if density is not None else rate
+        axes = [("All", value)]
     else:
         legacy_type = getattr(condition, "Type", "")
         if "constraintfixed" in type_name or legacy_type == "Fixed":
@@ -671,7 +709,8 @@ def _condition_to_dict(
             axes = _displacement_components(condition)
         elif "force" in type_name or legacy_type == "Force":
             condition_type = "Force"
-            axes = _force_components(condition)
+            # A zero force component applies nothing; Core needs X or Z per record.
+            axes = [(axis, value) for axis, value in _force_components(condition) if abs(value) > 1e-12]
         elif legacy_type == "Velocity":
             condition_type = "Velocity"
             axes = [
@@ -706,14 +745,15 @@ def _condition_to_dict(
             if thermal:
                 if condition_type in ("Convection", "Radiation"):
                     record["ambientTemperature"] = _first_numeric_value(
-                        condition, ("AmbientTemperature", "Temperature"), 293.15, "K"
+                        condition, ("AmbientTemp", "AmbientTemperature", "Temperature"), 293.15, "K"
                     )
                     record["emissivity"] = _first_numeric_value(
                         condition, ("Emissivity",), 0.0
                     )
                 if condition_type == "Convection":
                     record["filmCoefficient"] = _first_numeric_value(
-                        condition, ("FilmCoefficient", "HeatTransferCoefficient"), 0.0, "W/m^2/K"
+                        condition, ("FilmCoef", "FilmCoefficient", "HeatTransferCoefficient"),
+                        0.0, "W/m^2/K"
                     )
             record.update(target)
             output.append(record)
