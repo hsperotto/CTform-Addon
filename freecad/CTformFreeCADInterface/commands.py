@@ -14,7 +14,6 @@ from PySide import QtWidgets
 from .analysis import analysis_for_case, find_case, find_solver, make_case, make_solver
 from .case_export import write_case_json
 from .components import CTformTool, CTformWorkpiece, make_tool, make_workpiece
-from .viewproviders import attach_view_provider
 from .contacts import make_contact_pair
 from .loadsteps import (
     CTformLoadStep,
@@ -449,7 +448,6 @@ class CreateWorkpieceCommand:
         doc = App.ActiveDocument
         doc.openTransaction("Create CTform Workpiece")
         workpiece = make_workpiece(doc, analysis_for_case(case), case, shape)
-        attach_view_provider(workpiece)
         doc.recompute()
         doc.commitTransaction()
         Gui.Selection.clearSelection()
@@ -487,7 +485,6 @@ class CreateToolCommand:
         tool = make_tool(
             doc, analysis_for_case(case), case, shape, tool_name.strip()
         )
-        attach_view_provider(tool)
         doc.recompute()
         doc.commitTransaction()
         Gui.Selection.clearSelection()

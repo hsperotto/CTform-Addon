@@ -3,6 +3,8 @@
 
 """CTform load-step and process-condition document objects."""
 
+from .viewproviders import attach_view_provider
+
 
 class CTformLoadStep:
     """A process interval serialized into loadsteps.json."""
@@ -103,6 +105,7 @@ def make_load_step(doc, analysis, name="CTformLoadStep"):
     obj.StepId = max((getattr(step, "StepId", 0) for step in steps), default=0) + 1
     analysis.addObject(obj)
     _link_to_case(analysis, "LoadSteps", obj)
+    attach_view_provider(obj)
     return obj
 
 
