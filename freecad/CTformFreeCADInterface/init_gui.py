@@ -116,6 +116,14 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 			],
 		)
 
+	def Activated(self):
+		import FreeCAD as App
+
+		from .viewproviders import attach_view_providers
+
+		if App.ActiveDocument is not None:
+			attach_view_providers(App.ActiveDocument)
+
 	def GetClassName(self):
 		return "Gui::PythonWorkbench"
 
