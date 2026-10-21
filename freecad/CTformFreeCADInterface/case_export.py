@@ -99,6 +99,7 @@ def case_to_dict(
         "run": {
             "geometryOnly": _value(solver, "GeometryOnly", False),
             "targetCompression": _length_to_si(_value(solver, "TargetCompression", 7.0)),
+            **_external_tools(solver),
         },
         "ale": {"enabled": _value(solver, "ALEEnabled", False)},
         "remesh": {"enabled": _value(solver, "RemeshEnabled", False)},
@@ -274,26 +275,36 @@ def _check_workpiece_force(
 ) -> None:
     if "force" not in _condition_type_name(condition) and getattr(condition, "Type", "") != "Force":
         return
-    tool_data = _condition_tool_data(condition, case)
-    if tool_data is not None:
-        # Core's force servo only pushes toward -Z, so it cannot drive a lower tool.
-        tool = next(
-            (item for item in getattr(case, "Tools", ()) or ()
-             if str(getattr(item, "ToolId", "")) == tool_data["id"]),
-            None,
-        )
-        # With "auto", Core infers the role and would reject a lower tool only at load time.
-        if str(getattr(tool, "Role", "auto")) != "upper":
-            issues.append(
-                f"Force condition {getattr(condition, 'Label', '')!r}: set Role to 'upper' on "
-                f"Tool {tool_data['name']!r}; Core v2 force-controlled motion only works on an upper tool."
-            )
-        return
-    if str(_value(solver, "MechanicalFormulation", "flow")) != "flow":
+    label = getattr(condition, "Label", "")
+    if _condition_tool_data(condition, case) is None:
         issues.append(
-            f"Force condition {getattr(condition, 'Label', '')!r}: Core v2 applies workpiece "
-            "forces only with the flow formulation."
+            f"Force condition {label!r}: forces are only allowed on Tools as the press force; "
+            "remove it from the Workpiece."
         )
+        return
+    if str(_value(solver, "ModelingType", "axisymmetric")) != "axisymmetric":
+        return
+    try:
+        direction, _ = _tool_force_direction(condition)
+    except ValueError:
+        return
+    if abs(direction[0]) > 1e-9:
+        issues.append(
+            f"Force condition {label!r}: an axisymmetric Tool force cannot have a radial "
+            "component (a full ring carries no net radial force); use an axial direction."
+        )
+
+
+def _external_tools(solver: object | None) -> dict[str, Any]:
+    """Optional Gmsh executable and MMG folder; omitted when both are empty."""
+    tools = {}
+    gmsh = str(_value(solver, "GmshExecutable", "") or "").strip()
+    mmg = str(_value(solver, "MmgDirectory", "") or "").strip()
+    if gmsh:
+        tools["gmsh"] = gmsh
+    if mmg:
+        tools["mmgDirectory"] = mmg
+    return {"externalTools": tools} if tools else {}
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
@@ -721,9 +732,9 @@ def _condition_to_dict(
             condition_type = "Displacement"
             axes = _displacement_components(condition)
         elif "force" in type_name or legacy_type == "Force":
-            condition_type = "Force"
-            # A zero force component applies nothing; Core needs X or Z per record.
-            axes = [(axis, value) for axis, value in _force_components(condition) if abs(value) > 1e-12]
+            # Core takes forces only as tool motion; the readiness check reports
+            # this condition, so it is not exported as a workpiece Force BC.
+            return []
         elif legacy_type == "Velocity":
             condition_type = "Velocity"
             axes = [
@@ -928,6 +939,22 @@ def _force_components(condition: object) -> list[tuple[str, float]]:
     return [(_map_fem_axis(axis), force)]
 
 
+def _tool_force_direction(condition: object) -> tuple[list[float], float]:
+    """Return (unit direction [dx, 0, dz] in Core coordinates, magnitude in N).
+
+    The direction comes from the FEM DirectionVector, which already includes
+    Reversed; FEM X is Core X (radial) and FEM Y is Core Z (axial).
+    """
+    components = dict(_force_components(condition))
+    fx, fz = components.get("X", 0.0), components.get("Z", 0.0)
+    magnitude = (fx * fx + fz * fz) ** 0.5
+    if magnitude <= 1e-12:
+        raise ValueError(
+            f"Force condition {getattr(condition, 'Label', '')!r} on a Tool needs a non-zero force"
+        )
+    return [fx / magnitude, 0.0, fz / magnitude], magnitude
+
+
 def _map_fem_axis(axis: str) -> str:
     axis = axis.upper()
     if axis == "Y":
@@ -1005,17 +1032,13 @@ def _tool_motion_to_dict(
             "scope": scope,
         }
     if "force" in type_name:
-        components = _force_components(condition)
-        axial_force = next((value for axis, value in components if axis == "Z"), 0.0)
-        if abs(axial_force) <= 1e-12:
-            raise ValueError("CTform force-controlled tool motion requires an axial FEM force")
+        direction, magnitude = _tool_force_direction(condition)
         return {
             "id": identifier,
             "toolId": tool_id,
             "name": tool_name,
             "type": "Motion",
-            "motion": {"type": "force", "axis": "Z", "value": axial_force},
-            "forceTarget": abs(axial_force),
+            "motion": {"type": "force", "direction": direction, "value": magnitude},
             "active": active,
             "scope": scope,
         }

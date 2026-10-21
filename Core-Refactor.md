@@ -425,9 +425,29 @@ Temperature `CFlux` have no Core equivalent and are rejected. The
 non-Temperature, Force and TabulatedFlowStress readiness issues were removed.
 - **Core still rejects:** `remesh.enabled`, mixed Tri3/Quad4, 3D, deformable
 tools, and `motion.type=force` on a lower tool; readiness reports these and requires
-an explicit `upper` Role on force-driven tools. Core
+nothing for tool Role. Core
 also requires a complete `flowStressTable` grid, which readiness checks.
 - **Merge order:** addon `agent/core-thermal-force-sync` after Core
 `agent/v2-thermal-bcs` reaches Core `master`.
 - **Open in Core:** a force-controlled punch (`motion.type=force`) moved 7.8 mm
 in one increment with zero ring contact force.
+
+### 2026-10-21: Tool force direction, no workpiece forces
+
+- **Decision (user):** forces exist only on tools, as the press force. A FEM
+force constraint on workpiece geometry is a readiness error and is never
+exported as `mechanicalBCs` type `Force`.
+- **Tool force motion:** `motion {"type": "force", "direction": [dx, 0, dz],
+"value": F}`; `direction` is the unit vector from the FEM `DirectionVector`
+(Reversed included; FEM X -> Core X, FEM Y -> Core Z), `value` is the magnitude
+in N (>= 0), and the sign lives only in `direction`. `axis` and `forceTarget`
+are no longer written. Axisymmetric cases reject a radial component in
+readiness; plane strain allows it.
+- **Tool role:** optional. The addon writes `geometry.tools[].role` only when
+`upper`/`lower` is set, and no longer requires it for force motion.
+- **Contact interface fields written:** `slave {body: "workpiece",
+physicalGroupId, physicalGroup}`, `master {body: "tool", name, toolId,
+physicalGroup?}`, `masterBody` (tool name), `masterToolId`, `slaveBody`,
+`target`, `masterPhysicalGroup`, `friction`, `thermal`, `gapTolerance`.
+- **Optional:** Solver `GmshExecutable`/`MmgDirectory` -> `run.externalTools
+{gmsh, mmgDirectory}`.

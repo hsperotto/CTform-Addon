@@ -407,6 +407,8 @@ class CaseExportTests(unittest.TestCase):
             },
         )
         self.assertEqual(data["masterToolId"], "tool-upper-id")
+        self.assertEqual(data["masterBody"], "UpperPunch")
+        self.assertEqual(data["slaveBody"], "workpiece")
         self.assertEqual(data["slave"]["body"], "workpiece")
         self.assertEqual(data["master"]["body"], "tool")
         self.assertEqual(data["friction"]["coefficient"], 0.22)
@@ -674,16 +676,16 @@ class CaseExportTests(unittest.TestCase):
         self.assertIn("Step support", exported["warnings"][0])
         self.assertIn("Global support", exported["warnings"][0])
 
-    def test_native_tool_force_becomes_force_control(self):
+    def _tool_force_step(self, direction_vector, force=500.0):
         tool_profile = SimpleNamespace()
         condition = SimpleNamespace(
             TypeId="Fem::ConstraintForce",
             Proxy=None,
             Label="Punch force",
             References=[(tool_profile, ["Edge1"])],
-            Force=500.0,
+            Force=force,
             Direction=(tool_profile, ["Edge1"]),
-            DirectionVector=SimpleNamespace(x=0.0, y=1.0, z=0.0),
+            DirectionVector=SimpleNamespace(**dict(zip("xyz", direction_vector))),
             Active=True,
         )
         tool = SimpleNamespace(
@@ -691,55 +693,78 @@ class CaseExportTests(unittest.TestCase):
             ToolName="Punch", Label="CTform Tool: Punch"
         )
         step = SimpleNamespace(
-            StepId=1,
-            StepName="Press",
-            StartTime=0.0,
-            EndTime=1.0,
-            Increments=10,
-            MechanicalBCs=[condition],
-            ThermalBCs=[],
-            ToolMotions=[],
+            StepId=1, StepName="Press", StartTime=0.0, EndTime=1.0, Increments=10,
+            MechanicalBCs=[condition], ThermalBCs=[], ToolMotions=[],
+        )
+        return SimpleNamespace(LoadSteps=[step], Tools=[tool]), condition
+
+    def test_native_tool_force_exports_direction_and_magnitude(self):
+        case, _ = self._tool_force_step((0.0, 1.0, 0.0))
+
+        record = loadsteps_to_dict(case)["loadSteps"][0]["tools"][0]
+
+        self.assertEqual(
+            record["motion"], {"type": "force", "direction": [0.0, 0.0, 1.0], "value": 500.0}
+        )
+        self.assertNotIn("forceTarget", record)
+        self.assertNotIn("axis", record["motion"])
+
+    def test_reversed_tool_force_keeps_sign_in_direction_only(self):
+        case, _ = self._tool_force_step((0.0, -1.0, 0.0))
+
+        motion = loadsteps_to_dict(case)["loadSteps"][0]["tools"][0]["motion"]
+
+        self.assertEqual(motion["direction"], [0.0, 0.0, -1.0])
+        self.assertEqual(motion["value"], 500.0)
+
+    def test_negative_force_value_flips_direction_and_stays_non_negative(self):
+        case, _ = self._tool_force_step((0.0, 1.0, 0.0), force=-500.0)
+
+        motion = loadsteps_to_dict(case)["loadSteps"][0]["tools"][0]["motion"]
+
+        self.assertEqual(motion["direction"], [0.0, 0.0, -1.0])
+        self.assertEqual(motion["value"], 500.0)
+
+    def test_oblique_tool_force_direction_is_a_unit_vector(self):
+        case, _ = self._tool_force_step((3.0, 4.0, 0.0), force=100.0)
+
+        motion = loadsteps_to_dict(case)["loadSteps"][0]["tools"][0]["motion"]
+
+        self.assertAlmostEqual(motion["direction"][0], 0.6)
+        self.assertAlmostEqual(motion["direction"][2], 0.8)
+        self.assertEqual(motion["direction"][1], 0.0)
+        self.assertAlmostEqual(motion["value"], 100.0)
+
+    def test_zero_tool_force_is_rejected(self):
+        case, _ = self._tool_force_step((0.0, 1.0, 0.0), force=0.0)
+
+        with self.assertRaisesRegex(ValueError, "non-zero force"):
+            loadsteps_to_dict(case)
+    def test_radial_tool_force_is_exported_and_flagged_for_axisymmetric_cases(self):
+        case, condition = self._tool_force_step((1.0, 0.0, 0.0))
+
+        motion = loadsteps_to_dict(case)["loadSteps"][0]["tools"][0]["motion"]
+        axisymmetric = _core_v2_unsupported_issues(
+            case, {}, {}, SimpleNamespace(ModelingType="axisymmetric")
+        )
+        plane_strain = _core_v2_unsupported_issues(
+            case, {}, {}, SimpleNamespace(ModelingType="plane_strain")
         )
 
-        exported = loadsteps_to_dict(
-            SimpleNamespace(LoadSteps=[step], Tools=[tool])
-        )["loadSteps"][0]
+        self.assertEqual(motion["direction"], [1.0, 0.0, 0.0])
+        self.assertEqual(len(axisymmetric), 1)
+        self.assertIn("radial", axisymmetric[0])
+        self.assertEqual(plane_strain, [])
 
-        self.assertEqual(exported["tools"][0]["forceTarget"], 500.0)
-        self.assertEqual(exported["tools"][0]["motion"]["axis"], "Z")
+    def test_axial_tool_force_has_no_role_requirement(self):
+        case, _ = self._tool_force_step((0.0, 1.0, 0.0))
+        case.Tools[0].Role = "auto"
 
-    def test_radial_native_tool_force_is_not_mapped_to_axial_control(self):
-        tool_profile = SimpleNamespace()
-        condition = SimpleNamespace(
-            TypeId="Fem::ConstraintForce",
-            Proxy=None,
-            Label="Radial punch force",
-            References=[(tool_profile, ["Edge1"])],
-            Force=500.0,
-            Direction=(tool_profile, ["Edge1"]),
-            DirectionVector=SimpleNamespace(x=1.0, y=0.0, z=0.0),
-            Active=True,
-        )
-        tool = SimpleNamespace(
-            Shape=tool_profile,
-            ToolId="tool-punch-id",
-            ToolName="Punch",
-            Label="CTform Tool: Punch",
-        )
-        step = SimpleNamespace(
-            StepId=1,
-            StepName="Press",
-            StartTime=0.0,
-            EndTime=1.0,
-            Increments=10,
-            MechanicalBCs=[condition],
-            ThermalBCs=[],
-            ToolMotions=[],
+        issues = _core_v2_unsupported_issues(
+            case, {}, {}, SimpleNamespace(ModelingType="axisymmetric")
         )
 
-        with self.assertRaisesRegex(ValueError, "requires an axial FEM force"):
-            loadsteps_to_dict(SimpleNamespace(LoadSteps=[step], Tools=[tool]))
-
+        self.assertEqual(issues, [])
     def test_native_tool_temperature_condition_is_rejected(self):
         tool_profile = SimpleNamespace()
         condition = SimpleNamespace(
@@ -795,7 +820,7 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(exported["thermalBCs"][0]["type"], "Temperature")
         self.assertEqual(exported["thermalBCs"][0]["value"], 650.0)
 
-    def test_native_workpiece_force_exports_as_force_bc(self):
+    def test_native_workpiece_force_is_not_exported_and_is_a_readiness_issue(self):
         condition = SimpleNamespace(
             TypeId="Fem::ConstraintForce",
             Proxy=None,
@@ -815,13 +840,14 @@ class CaseExportTests(unittest.TestCase):
             ThermalBCs=[],
             ToolMotions=[],
         )
+        case = SimpleNamespace(LoadSteps=[step], Tools=[])
 
-        exported = loadsteps_to_dict(SimpleNamespace(LoadSteps=[step]))["loadSteps"][0]
+        exported = loadsteps_to_dict(case)["loadSteps"][0]
+        issues = _core_v2_unsupported_issues(case, {}, {}, SimpleNamespace())
 
-        self.assertEqual(exported["mechanicalBCs"][0]["type"], "Force")
-        self.assertEqual(exported["mechanicalBCs"][0]["axis"], "Z")
-        self.assertEqual(exported["mechanicalBCs"][0]["value"], 500.0)
-
+        self.assertEqual(exported["mechanicalBCs"], [])
+        self.assertEqual(len(issues), 1)
+        self.assertIn("only allowed on Tools", issues[0])
     def test_native_body_heat_source_maps_to_heat_generation(self):
         profile = SimpleNamespace(Shape=SimpleNamespace())
         proxy = type("ConstraintBodyHeatSource", (), {})()
@@ -924,7 +950,7 @@ class CaseExportTests(unittest.TestCase):
         self.assertTrue(any("Tri3 and Quad4" in issue for issue in issues))
         self.assertTrue(any("CFlux" in issue for issue in issues))
         self.assertTrue(any("Total Power" in issue for issue in issues))
-        self.assertTrue(any("flow formulation" in issue for issue in issues))
+        self.assertTrue(any("only allowed on Tools" in issue for issue in issues))
 
     def test_flow_stress_table_must_be_a_complete_grid(self):
         from freecad.CTformFreeCADInterface.materials import _is_complete_flow_stress_grid
@@ -938,27 +964,18 @@ class CaseExportTests(unittest.TestCase):
         self.assertFalse(_is_complete_flow_stress_grid(grid[:-1]))
         self.assertFalse(_is_complete_flow_stress_grid(grid + grid[:1]))
 
-    def test_force_motion_on_lower_tool_is_a_readiness_issue(self):
-        die_profile = SimpleNamespace()
-        force = SimpleNamespace(
-            TypeId="Fem::ConstraintForce", Proxy=None, Label="Die force",
-            References=[(die_profile, ["Edge1"])],
+    def test_external_tools_are_written_only_when_set(self):
+        from freecad.CTformFreeCADInterface.case_export import _external_tools
+
+        self.assertEqual(_external_tools(SimpleNamespace()), {})
+        self.assertEqual(
+            _external_tools(SimpleNamespace(GmshExecutable="C:/gmsh.exe", MmgDirectory="")),
+            {"externalTools": {"gmsh": "C:/gmsh.exe"}},
         )
-        die = SimpleNamespace(
-            Shape=die_profile, ToolId="die", ToolName="Die", Label="Die", Role="lower"
+        self.assertEqual(
+            _external_tools(SimpleNamespace(GmshExecutable="", MmgDirectory="C:/mmg")),
+            {"externalTools": {"mmgDirectory": "C:/mmg"}},
         )
-        step = SimpleNamespace(StepId=1, MechanicalBCs=[force], ThermalBCs=[], ToolMotions=[])
-
-        def issues_for(role):
-            die.Role = role
-            return _core_v2_unsupported_issues(
-                SimpleNamespace(LoadSteps=[step], Tools=[die]), {}, {}, SimpleNamespace()
-            )
-
-        self.assertEqual(len(issues_for("lower")), 1)
-        self.assertIn("upper tool", issues_for("auto")[0])
-        self.assertEqual(issues_for("upper"), [])
-
     def _thermal_step(self, condition):
         return SimpleNamespace(
             StepId=1, StepName="Heat", StartTime=0.0, EndTime=1.0, Increments=1,

@@ -107,7 +107,7 @@ def contact_pair_to_dict(pair, mesh_groups=None):
         "master": {"body": "tool", **master_reference},
         "target": slave_group,
         "slaveBody": "workpiece",
-        "masterBody": "tool",
+        "masterBody": master_name,
         "masterToolId": master_tool_id,
         "masterPhysicalGroup": master_group,
         "gapTolerance": _length_to_si(getattr(pair, "GapTolerance", 0.0)),

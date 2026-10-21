@@ -17,12 +17,19 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - Native thermal BCs follow Core v2 (Core `a462978`): FreeCAD Heat Flux
   exports by ConstraintType (DFlux -> HeatFlux, Convection, Radiation); body
   heat source Dissipation Rate (W/kg) x workpiece density -> HeatGeneration
-  W/m^3. CFlux and Total Power are rejected. Workpiece Force BCs are exported
-  (flow formulation only); zero force components are dropped.
+  W/m^3. CFlux and Total Power are rejected.
 - Readiness also checks that a TabulatedFlowStress table is a complete
-  T x rate x strain grid, and that force-controlled motion is on a Tool
-  with Role `upper` (Core's servo only pushes toward -Z; `auto` is not enough).
-- 57 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+  T x rate x strain grid.
+- Forces: only on Tools. Tool force motion exports
+  `motion {type: "force", direction: [dx, 0, dz], value: F >= 0}` from the FEM
+  force's DirectionVector (Reversed included); `axis` and `forceTarget` are no
+  longer written. A Force condition on the Workpiece is a readiness error and is
+  never exported. An axisymmetric Tool force with a radial component is a
+  readiness error. Tool `Role` is optional and no longer required for forces.
+- Solver `GmshExecutable` / `MmgDirectory` export `run.externalTools` when set.
+- Contact interfaces name their master tool explicitly (`masterBody`,
+  `masterToolId`, `master.name/toolId`) and the workpiece slave group.
+- 62 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
