@@ -4,6 +4,7 @@
 """CTform workpiece and tool component folders."""
 
 from .identifiers import readable_id
+from .viewproviders import attach_view_provider
 
 
 class CTformWorkpiece:
@@ -79,6 +80,7 @@ def make_workpiece(doc, analysis, case, shape, name="CTformWorkpiece"):
     analysis.addObject(obj)
     obj.addObject(shape)
     case.Workpiece = obj
+    attach_view_provider(obj)
     return obj
 
 
@@ -110,6 +112,7 @@ def make_tool(
     tools = list(getattr(case, "Tools", ()) or ())
     tools.append(obj)
     case.Tools = tools
+    attach_view_provider(obj)
     return obj
 
 

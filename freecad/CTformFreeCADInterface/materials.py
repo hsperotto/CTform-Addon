@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .identifiers import readable_id
+from .viewproviders import attach_view_provider
 
 
 MATERIAL_MODELS = (
@@ -124,6 +125,7 @@ def make_material(
         _apply_material_record(obj, record)
     if component is not None:
         component.Material = obj
+    attach_view_provider(obj)
     return obj
 
 
