@@ -401,8 +401,8 @@ warning; runs when `readinessIssues` is empty.
 `InitialToolTemperature` (K) are exported as `thermal.initialTemperature`;
 Tool Motion records resolve `toolId` (new `ToolId` property, else by tool name);
 `packageStatus` is `ready` when there are no readiness issues.
-- **Tool role:** Tool folders have `Role` (auto/upper/lower); an explicit value
-is exported as `geometry.tools[].role`, `auto` omits it so Core infers it from
+- **Tool role (superseded 2026-10-30):** Tool folders had `Role` (auto/upper/lower); an explicit value
+was exported as `geometry.tools[].role`, `auto` omitted it so Core inferred it from
 DXF position.
 - **Readiness issues now report what Core v2 rejects:** non-Temperature
 workpiece thermal BCs, workpiece Force BCs, `remesh.enabled`, mixed Tri3/Quad4
@@ -451,3 +451,12 @@ physicalGroup?}`, `masterBody` (tool name), `masterToolId`, `slaveBody`,
 `target`, `masterPhysicalGroup`, `friction`, `thermal`, `gapTolerance`.
 - **Optional:** Solver `GmshExecutable`/`MmgDirectory` -> `run.externalTools
 {gmsh, mmgDirectory}`.
+
+### 2026-10-30: Tool role removed
+
+- Core no longer uses tool roles (it derives each tool's side from the centre of
+its Z range against the workpiece mid-plane; a tool centred on the mid-plane is an
+error). The addon no longer exports `geometry.tools[].role` and removes the Tool
+`Role` property, including from older documents. A contact interface belongs to its
+master tool by name (`master.name` / `toolId`), unchanged. Draw tools clearly above
+or below the sheet.

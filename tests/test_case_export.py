@@ -758,7 +758,6 @@ class CaseExportTests(unittest.TestCase):
 
     def test_axial_tool_force_has_no_role_requirement(self):
         case, _ = self._tool_force_step((0.0, 1.0, 0.0))
-        case.Tools[0].Role = "auto"
 
         issues = _core_v2_unsupported_issues(
             case, {}, {}, SimpleNamespace(ModelingType="axisymmetric")
@@ -877,22 +876,19 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(bc["value"], 12.5)
         self.assertEqual(bc["target"], "All")
 
-    def test_tool_role_is_exported_only_when_set(self):
-        def tool(tool_id, role):
+    def test_tool_role_is_never_exported(self):
+        def tool(tool_id):
             return SimpleNamespace(
-                ToolId=tool_id, ToolName=tool_id, Label=tool_id, Role=role,
+                ToolId=tool_id, ToolName=tool_id, Label=tool_id, Role="upper",
                 Material=None, ToolLayer="ToolProfile", InitialOffsetZ=0.0, SymmetryR=0.0,
             )
 
-        case = SimpleNamespace(
-            Workpiece=None, Tools=[tool("punch", "upper"), tool("die", "lower"), tool("aux", "auto")]
-        )
+        case = SimpleNamespace(Workpiece=None, Tools=[tool("punch"), tool("die")])
 
-        tools = {item["id"]: item for item in _geometry_from_components(case)["tools"]}
+        tools = _geometry_from_components(case)["tools"]
 
-        self.assertEqual(tools["punch"]["role"], "upper")
-        self.assertEqual(tools["die"]["role"], "lower")
-        self.assertNotIn("role", tools["aux"])
+        self.assertTrue(tools)
+        self.assertTrue(all("role" not in item for item in tools))
 
     def test_thermal_exports_initial_temperature_from_solver(self):
         solver = SimpleNamespace(

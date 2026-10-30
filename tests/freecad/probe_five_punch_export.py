@@ -47,6 +47,7 @@ HOLDER_GAP = 0.05
 STROKE = 30.0
 PRESSURE_MPA = 5.0
 PRESS_SPEED = 19.5  # mm/s, Rocha (2022); not stated by Nunes
+WITH_HOLDER = os.environ.get("CTFORM_PROBE_NO_HOLDER") != "1"
 
 
 def arc(center, radius, start_deg, end_deg):
@@ -121,8 +122,9 @@ def build():
     tools = {
         "Punch": components.make_tool(doc, fem, case, punch, "Punch"),
         "Die": components.make_tool(doc, fem, case, die, "Die"),
-        "BlankHolder": components.make_tool(doc, fem, case, holder, "BlankHolder"),
     }
+    if WITH_HOLDER:
+        tools["BlankHolder"] = components.make_tool(doc, fem, case, holder, "BlankHolder")
 
     imported = {m.MaterialName: m for m in materials.import_material_catalog(doc, fem, case, CATALOG)}
     workpiece.Material = imported["AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)"]
@@ -166,6 +168,9 @@ def build():
     fem.addObject(die_fixed)
     loadsteps.attach_condition(step, die_fixed)
 
+    if not WITH_HOLDER:
+        doc.recompute()
+        return doc, case
     holder_force = ObjectsFem.makeConstraintForce(doc, "BlankHolderForce")
     holder_force.References = [(holder, "Face1")]
     down = feature(doc, "ForceDirection", Part.makeLine(App.Vector(0, 5, 0), App.Vector(0, 0, 0)))

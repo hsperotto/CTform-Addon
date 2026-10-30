@@ -59,10 +59,10 @@ class CTformTool:
         _add(obj, "Shape", "App::PropertyLink", "Component", None)
         _add(obj, "Mesh", "App::PropertyLink", "Component", None)
         _add(obj, "Material", "App::PropertyLink", "Component", None)
-        if "Role" not in obj.PropertiesList:
-            obj.addProperty("App::PropertyEnumeration", "Role", "Export")
-            obj.Role = ["auto", "upper", "lower"]
-            obj.Role = "auto"
+        # Core derives each tool's side from its geometry; older documents
+        # still carry the removed Role setting.
+        if "Role" in obj.PropertiesList:
+            obj.removeProperty("Role")
         _add(obj, "ToolLayer", "App::PropertyString", "Export", "ToolProfile")
         _add(obj, "InitialOffsetZ", "App::PropertyFloat", "Export", 0.0)
         _add(obj, "SymmetryR", "App::PropertyFloat", "Export", 0.0)

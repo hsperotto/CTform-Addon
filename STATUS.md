@@ -12,8 +12,8 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - Initial temperatures live on the Solver (`thermal.initialTemperature`);
   tool motions export `toolId`; readiness lists features Core v2 rejects;
   `packageStatus` is `ready` when no issues remain.
-- Tools have a `Role` (auto/upper/lower); upper/lower is exported as
-  `geometry.tools[].role`, auto lets Core infer it from the DXF position.
+- Tool `Role` is removed (Core derives each tool's side from its geometry):
+  no `geometry.tools[].role` is exported and old documents lose the property.
 - Native thermal BCs follow Core v2 (Core `a462978`): FreeCAD Heat Flux
   exports by ConstraintType (DFlux -> HeatFlux, Convection, Radiation); body
   heat source Dissipation Rate (W/kg) x workpiece density -> HeatGeneration
@@ -25,7 +25,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   force's DirectionVector (Reversed included); `axis` and `forceTarget` are no
   longer written. A Force condition on the Workpiece is a readiness error and is
   never exported. An axisymmetric Tool force with a radial component is a
-  readiness error. Tool `Role` is optional and no longer required for forces.
+  readiness error. Forces need no tool role.
 - Solver `GmshExecutable` / `MmgDirectory` export `run.externalTools` when set.
 - DXF export no longer uses FreeCAD's exporter: it wrote any arc with a chord
   shorter than ~1e-2 units (every R6 mm corner, exported in metres) as a full
@@ -52,7 +52,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 
 ## Next
 1. Fresh interactive run of `MANUAL-SMOKE-TEST.md` in FreeCAD; renumber old
-   StepIds, set Solver initial temperatures and Tool roles, re-export SmokeTest.
+   StepIds, set Solver initial temperatures, re-export SmokeTest.
 2. Run the exported SmokeTest with Core `agent/v2-thermal-bcs` end to end.
 3. Validate contact-pair physical-group references; add conflict diagnostics.
 4. Harden SI geometry export and preflight for more CAD shapes.
