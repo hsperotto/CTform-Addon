@@ -142,8 +142,9 @@ def build():
     mesh.RecombineAll = os.environ.get("CTFORM_PROBE_QUAD") == "1"  # structured Quad4 for displacement runs
     if os.environ.get("CTFORM_PROBE_ALGO2D"):
         mesh.Algorithm2D = os.environ["CTFORM_PROBE_ALGO2D"]
-    mesh.CharacteristicLengthMax = "0.25 mm"
-    mesh.CharacteristicLengthMin = "0.1 mm"
+    scale = float(os.environ.get("CTFORM_PROBE_MESH_SCALE", "1"))  # 2 = coarser, 0.5 = finer
+    mesh.CharacteristicLengthMax = f"{0.25 * scale} mm"
+    mesh.CharacteristicLengthMin = f"{0.1 * scale} mm"
     workpiece.Mesh = mesh
     workpiece.addObject(mesh)
     doc.recompute()
