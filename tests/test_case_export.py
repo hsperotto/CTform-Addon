@@ -413,6 +413,9 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(data["master"]["body"], "tool")
         self.assertEqual(data["friction"]["coefficient"], 0.22)
         self.assertEqual(data["gapTolerance"], 0.00025)
+        self.assertNotIn("normal", data)
+        pair.Penalty = 5.0e12
+        self.assertEqual(contact_pair_to_dict(pair, [{"id": 7102, "name": "EdgeTop", "dimension": 1}])["normal"], {"penalty": 5.0e12})
 
     def test_native_tool_displacement_becomes_step_tool_velocity(self):
         tool_profile = SimpleNamespace()

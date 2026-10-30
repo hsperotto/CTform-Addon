@@ -29,6 +29,7 @@ class CTformContactPair:
         _add(obj, "SlavePhysicalGroup", "App::PropertyString", "Contact", "All")
         _add(obj, "MasterPhysicalGroup", "App::PropertyString", "Contact", "")
         _add(obj, "GapTolerance", "App::PropertyLength", "Normal", 0.0)
+        _add(obj, "Penalty", "App::PropertyFloat", "Normal", 0.0)  # 0 = Core default
         _add(obj, "FrictionModel", "App::PropertyEnumeration", "Friction", ["coulomb", "levanov", "tresca", "none"])
         _add(obj, "FrictionCoefficient", "App::PropertyFloat", "Friction", 0.3)
         _add(obj, "LevanovM", "App::PropertyFloat", "Friction", 0.3)
@@ -99,7 +100,7 @@ def contact_pair_to_dict(pair, mesh_groups=None):
     master_reference = {"name": master_name, "toolId": master_tool_id}
     if master_group:
         master_reference["physicalGroup"] = master_group
-    return {
+    record = {
         "id": str(getattr(pair, "PairId", "")),
         "name": str(getattr(pair, "PairName", getattr(pair, "Label", "Contact"))),
         "active": bool(getattr(pair, "Active", True)),
@@ -122,6 +123,12 @@ def contact_pair_to_dict(pair, mesh_groups=None):
             "heatTransferCoefficient": float(getattr(pair, "HeatTransferCoefficient", 0.0)),
         },
     }
+    penalty = float(getattr(pair, "Penalty", 0.0) or 0.0)
+    if penalty > 0.0:
+        # Core's legacy loader reads contactInterfaces[].normal.penalty; the v2
+        # normalizer does not keep it yet, so this is ignored until Core accepts it.
+        record["normal"] = {"penalty": penalty}
+    return record
 
 
 def _length_to_si(value):
