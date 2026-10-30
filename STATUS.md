@@ -72,3 +72,8 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 
 ## Release prep (branch agent/release-prep)
 - Version fields set to 1.0.0 and CHANGELOG.md written. The author creates the tag; merge only on the author's yes.
+
+## Developer docs (branch agent/dev-docs)
+- `docs/DEVELOPER-GUIDE.md`: module and object graphs, export and run flows, recipes, and
+  a code review of `main` at `d965fc0` with open findings (Run Core error handling, double-run
+  guard, stale DEVELOPMENT-CONTEXT and In progress notes).

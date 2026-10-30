@@ -2,6 +2,8 @@
 
 Read `STATUS.md` first, then `DEVELOPMENT-CONTEXT.md` (design rules) and
 `Core-Refactor.md` (Core contract). Naming rules are in `IDENTITY.md`.
+For how the code fits together (module and object graphs, export and run flows,
+recipes, review findings) read `docs/DEVELOPER-GUIDE.md`.
 
 ## Tests
 - Run: `python -m unittest discover -s tests`. pytest is not installed.
