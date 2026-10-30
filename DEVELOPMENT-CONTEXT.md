@@ -121,7 +121,7 @@ No FEM solver commands are exposed in CTform menus.
 
 ## Current validation
 
-The addon currently has 48 passing Python tests (`python -m unittest discover -s tests`). Python compilation and diagnostics
+The addon currently has 81 passing Python tests (`python -m unittest discover -s tests`, as of 2026-10-30). Python compilation and diagnostics
 also pass. FreeCAD 1.1 runtime probes have verified component-tree save/reopen,
 shared material catalog import with unit-aware values, nested Workpiece Gmsh
 MSH2 export in `From Shape` mode, and native FEM Force `DirectionVector` mapping.
@@ -136,11 +136,12 @@ interactive run.
    radial force and Workpiece Force are rejected. When assigning a tool Force,
    reference the Tool folder's source face so the condition can resolve its
    stable ToolId; selecting a separate sketch edge did not match the Tool shape.
-- **Resolved:** Initial-temperature object/property/export support was removed
-   from the addon. Ordinary Workpiece Temperature remains a maintained thermal
-   boundary condition. Tool Temperature constraints are rejected. Body Heat
-   Source and Heat Flux are outside the manual smoke-test scope (their native FEM
-   actions remain available in the workbench).
+- **Superseded (2026-10-30):** The statement that initial-temperature support was
+   removed no longer holds. Initial workpiece and tool temperatures are Solver
+   properties exported as `thermal.initialTemperature` (K). Workpiece Temperature,
+   Heat Flux, Convection, Radiation and body Heat Source are exported to Core v2
+   (see `STATUS.md`). Tool Temperature handling was not re-checked in the current
+   export code; verify it before relying on it.
 - **Resolved:** The native FEM Gmsh command is used. Set `ElementOrder` to `1st`
    in the task panel before generating; CTform exports first-order Tri3/Quad4.
    `ElementDimension=From Shape` is accepted for Face/Shell shapes.

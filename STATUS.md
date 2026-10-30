@@ -77,3 +77,6 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - `docs/DEVELOPER-GUIDE.md`: module and object graphs, export and run flows, recipes, and
   a code review of `main` at `d965fc0` with open findings (Run Core error handling, double-run
   guard, stale DEVELOPMENT-CONTEXT and In progress notes).
+- Branch `agent/run-core-errors`: Run CTform Core reports any worker failure, refuses a second
+  run while one is active, loads results into the document that started the run, and reports
+  an import failure instead of raising. Not yet merged; the command has not been exercised in FreeCAD.

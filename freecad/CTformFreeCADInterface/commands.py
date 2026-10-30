@@ -416,6 +416,15 @@ class RunCoreCommand:
 
         from .core_runner import run_core
 
+        active = getattr(self, "_timer", None)
+        if active is not None and active.isActive():
+            QtWidgets.QMessageBox.warning(
+                window, "Run CTform Core", "A Core run is already in progress; wait for it to finish."
+            )
+            return
+
+        # The result goes to the document that was active when the run started.
+        doc = App.ActiveDocument
         outcome = {}
 
         def work():
@@ -427,7 +436,7 @@ class RunCoreCommand:
                     gmsh=str(getattr(solver, "GmshExecutable", "") or "") or None,
                     mmg_directory=str(getattr(solver, "MmgDirectory", "") or "") or None,
                 )
-            except (OSError, ValueError) as error:
+            except Exception as error:  # any failure must reach the GUI, not kill the thread silently
                 outcome["error"] = error
 
         thread = threading.Thread(target=work, daemon=True)
@@ -440,13 +449,13 @@ class RunCoreCommand:
             if thread.is_alive():
                 return
             timer.stop()
-            self._report(outcome, window)
+            self._report(outcome, window, doc)
 
         timer.timeout.connect(poll)
         timer.start()
         self._timer = timer
 
-    def _import_results(self, result):
+    def _import_results(self, result, doc):
         """Load the step files as one scrubbable FEM post-processing result.
 
         Core writes the meridian plane as X (radius) and Z (axial); the model
@@ -456,11 +465,14 @@ class RunCoreCommand:
 
         if not result.steps:
             return
-        doc = App.ActiveDocument
         pipeline = doc.addObject("Fem::FemPostPipeline", "CTformResult")
-        pipeline.Label = "CTform Result"
-        times = step_times(result.steps, result.force_csv)
-        pipeline.read([str(path) for path in result.steps], times, App.Units.Unit("T"), "Time")
+        try:
+            pipeline.Label = "CTform Result"
+            times = step_times(result.steps, result.force_csv)
+            pipeline.read([str(path) for path in result.steps], times, App.Units.Unit("T"), "Time")
+        except Exception:
+            doc.removeObject(pipeline.Name)
+            raise
         analysis = analysis_for_case(find_case(doc))
         if analysis is not None:
             analysis.addObject(pipeline)
@@ -469,9 +481,9 @@ class RunCoreCommand:
         if view is not None:
             view.DisplayMode = "Surface"
 
-    def _report(self, outcome, window):
+    def _report(self, outcome, window, doc):
         if "error" in outcome:
-            QtWidgets.QMessageBox.warning(window, "Run CTform Core", str(outcome["error"]))
+            QtWidgets.QMessageBox.warning(window, "Run CTform Core", f"Core could not run: {outcome['error']}")
             return
         result = outcome["result"]
         for warning in result.warnings:
@@ -482,7 +494,11 @@ class RunCoreCommand:
         )
         if result.timed_out:
             summary += "; the process was stopped after the time limit"
-        self._import_results(result)
+        try:
+            self._import_results(result, doc)
+        except Exception as error:
+            App.Console.PrintError(f"CTform: could not load the Core results: {error}\n")
+            summary += f"; results not loaded ({error})"
         App.Console.PrintMessage(f"CTform Core finished: {summary}\n")
         QtWidgets.QMessageBox.information(window, "Run CTform Core", summary.replace("; ", "\n"))
 
