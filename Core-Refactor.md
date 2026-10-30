@@ -508,5 +508,5 @@ only along Z for now).
   displacement solver.
 - Catalog: `aisi304-1mm-ep-{rd0,rd45,rd90,mean}` with Rp0.2 217 / 206 / 210 / 211 MPa (Nunes
   Table 3; mean is arithmetic). E = 200 GPa, nu = 0.3.
-- Export is marked draft (`CORE_SWIFT_SUPPORTED = False`) until Core master reads the Swift
-  parameters (Cody, agent/cm1-friction-tangent, not merged). Flip the flag with that change.
+- Core master reads the Swift parameters since 35029aa, so `CORE_SWIFT_SUPPORTED = True` and such
+  exports are no longer marked draft.
