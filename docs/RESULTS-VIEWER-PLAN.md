@@ -74,11 +74,13 @@ Plotted, not a VTK field, and first in the panel:
    convenience view of Core's per-tool force output.
 
    **Stroke** is measured from the punch's first contact with the sheet, not from t = 0.
-   Proposed rule (Thay, 2026-10-30; not yet approved by the author): stroke = punch
-   displacement minus the initial punch-sheet gap, which the case knows exactly. Cross-check:
-   the first step where punch force exceeds 1 % of the final punch force (not "> 0", since
-   a penalty contact can show a tiny force before real contact). Until the author approves
-   the rule, the plot is labelled "stroke (unconfirmed)".
+   Rule (approved by Henrique, relayed by Thay 2026-10-30): stroke = punch displacement
+   minus the initial punch-sheet gap of the case. Cross-check: the first point where punch
+   force exceeds 1 % of the PEAK punch force (not the final force, which can be near zero
+   at the end of a full draw; not "> 0", since a penalty contact can show a tiny force
+   before real contact). The thesis repo implements this as
+   `compare_force.stroke_from_contact` and `first_contact_displacement` (branch
+   `agent/stroke-zero`). The viewer uses the same rule and label.
 
 VTK fields, in order:
 
