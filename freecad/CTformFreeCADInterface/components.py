@@ -33,6 +33,9 @@ class CTformWorkpiece:
         add_property(obj, "Material", "App::PropertyLink", "Component", None)
         add_property(obj, "ContactPairs", "App::PropertyLinkList", "Contact", [])
         add_property(obj, "MeshFile", "App::PropertyString", "Export", "workpiece.msh")
+        # A four-edge sheet face gets a transfinite Quad4 grid of square elements.
+        add_property(obj, "StructuredSheetMesh", "App::PropertyBool", "Mesh", False)
+        add_property(obj, "StructuredElementSize", "App::PropertyLength", "Mesh", 0.25)
 
 
 class CTformTool:

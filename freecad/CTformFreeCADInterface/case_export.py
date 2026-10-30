@@ -149,9 +149,12 @@ def _export_workpiece_mesh(case: object, package_directory: Path) -> dict[str, A
     relative_path = Path(_value(workpiece, "MeshFile", "workpiece.msh"))
     if relative_path.is_absolute() or ".." in relative_path.parts:
         raise ValueError("MeshFile must be a relative path inside the case package")
+    structured = bool(_value(workpiece, "StructuredSheetMesh", False))
+    structured_size = length_to_si(_value(workpiece, "StructuredElementSize", 0.25)) * 1e3 if structured else None
     metadata = export_gmsh_mesh(
         mesh_object,
         package_directory / relative_path,
+        structured_element_size=structured_size,
     )
     metadata["file"] = relative_path.as_posix()
     return metadata

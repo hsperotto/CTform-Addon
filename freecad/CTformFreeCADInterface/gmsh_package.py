@@ -25,12 +25,20 @@ def _is_supported_mesh_dimension(mesh_object: object) -> bool:
     return str(getattr(shape, "ShapeType", "")) in ("Face", "Shell")
 
 
-def export_gmsh_mesh(mesh_object: object, output_path: str | Path) -> dict[str, object]:
+def export_gmsh_mesh(
+    mesh_object: object,
+    output_path: str | Path,
+    *,
+    structured_element_size: float | None = None,
+) -> dict[str, object]:
     """Run the assigned FEM Gmsh object and save its mesh as native Gmsh MSH2.
 
     FreeCAD FEM's task panel normally saves the generated mesh as UNV for its
     in-document visualization. This repeats that object's Gmsh setup, emits the
     package MSH2 from the same Gmsh run, and refreshes the FEM preview from UNV.
+
+    With ``structured_element_size`` (millimetres) the four-edge sheet face gets a
+    transfinite, recombined Quad4 grid instead of Gmsh's free mesh.
     """
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +59,10 @@ def export_gmsh_mesh(mesh_object: object, output_path: str | Path) -> dict[str, 
     gmsh.prepare()
     geo_path = Path(gmsh.temp_file_geo)
     geo_text = _pin_physical_group_ids(geo_path.read_text(encoding="utf-8"))
+    if structured_element_size is not None:
+        geometry = getattr(mesh_object.Shape, "Shape", mesh_object.Shape)  # a feature link or a shape
+        lines = structured_sheet_lines(geometry, structured_element_size)
+        geo_text = inject_after_merge(geo_text, lines)
     geo_text += "\n// CTform package mesh export\n"
     geo_text += "Mesh.SaveAll = 0;\n"
     geo_text += "Mesh.MshFileVersion = 2.2;\n"
@@ -146,3 +158,84 @@ def _pin_physical_group_ids(geo_text: str) -> str:
 def _physical_tag(dimension: int, name: str) -> int:
     digest = hashlib.sha256(f"{dimension}:{name}".encode("utf-8")).digest()
     return (int.from_bytes(digest[:4], "big") & 0x3FFFFFFF) or 1
+
+
+_MERGE_LINE = re.compile(r'^\s*Merge\s+"[^"]*";\s*$', re.MULTILINE)
+
+
+def structured_sheet_lines(shape: object, element_size: float) -> list[str]:
+    """Return the Gmsh lines for a structured Quad4 grid on the sheet face of ``shape``.
+
+    The curve and surface tags are the FreeCAD indices of the edges and face, which
+    GmshTools also uses for its physical groups (EdgeN). ``element_size`` is in
+    millimetres, the unit of the FreeCAD document the geometry is merged in.
+    """
+    faces = list(getattr(shape, "Faces", ()) or ())
+    if len(faces) != 1:
+        raise ValueError("Structured sheet meshing needs a shape with exactly one face")
+    face = faces[0]
+    loop = list(face.OuterWire.OrderedEdges)
+    if len(loop) != 4 or len(face.Edges) != 4:
+        raise ValueError("Structured sheet meshing needs a face bounded by exactly four edges")
+    edge_tags = [_shape_index(shape.Edges, edge) for edge in loop]
+    return structured_grid_lines(
+        edge_tags,
+        [edge.Length for edge in loop],
+        element_size,
+        surface_tag=_shape_index(shape.Faces, face),
+    )
+
+
+def structured_grid_lines(
+    edge_tags: list[int],
+    lengths: list[float],
+    element_size: float,
+    surface_tag: int = 1,
+) -> list[str]:
+    """Return transfinite and recombine lines for a four-edge face.
+
+    ``edge_tags`` and ``lengths`` are in boundary order, so opposite edges are
+    positions 0/2 and 1/3. Each edge must be a whole number of elements long, so
+    the elements stay square; opposite edges must then have the same count.
+    """
+    if len(edge_tags) != 4 or len(lengths) != 4:
+        raise ValueError("A structured sheet needs four edges")
+    if element_size <= 0.0:
+        raise ValueError("The structured element size must be positive")
+    elements = []
+    for length in lengths:
+        ratio = length / element_size
+        if abs(ratio - round(ratio)) > 1e-6 or round(ratio) < 1:
+            raise ValueError(
+                f"Edge length {length:g} is not a whole number of {element_size:g} elements"
+            )
+        elements.append(round(ratio))
+    if elements[0] != elements[2] or elements[1] != elements[3]:
+        raise ValueError(
+            f"Opposite sheet edges need the same element count; got {elements} "
+            f"for lengths {lengths} and size {element_size:g}"
+        )
+    nodes = [count + 1 for count in elements]
+    return [
+        f"Transfinite Curve {{{edge_tags[0]}, {edge_tags[2]}}} = {nodes[0]} Using Progression 1;",
+        f"Transfinite Curve {{{edge_tags[1]}, {edge_tags[3]}}} = {nodes[1]} Using Progression 1;",
+        f"Transfinite Surface {{{surface_tag}}};",
+        f"Recombine Surface {{{surface_tag}}};",
+    ]
+
+
+def inject_after_merge(geo_text: str, lines: list[str]) -> str:
+    """Insert ``lines`` right after the Merge of the geometry, before any mesh settings."""
+    match = _MERGE_LINE.search(geo_text)
+    if match is None:
+        raise ValueError("The Gmsh geometry has no Merge line to attach the structured sheet to")
+    block = "\n// CTform structured sheet: transfinite Quad4 grid\n" + "\n".join(lines) + "\n"
+    return geo_text[: match.end()] + block + geo_text[match.end() :]
+
+
+def _shape_index(items, target) -> int:
+    """Return the 1-based FreeCAD index of ``target`` in ``items``."""
+    for index, item in enumerate(items, start=1):
+        if item.isSame(target):
+            return index
+    raise ValueError("The sheet edge or face is not part of the mesh shape")

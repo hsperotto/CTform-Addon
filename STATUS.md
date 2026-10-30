@@ -85,3 +85,15 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - `properties.py` holds the single `add_property` and `length_to_si` helpers (were duplicated in five modules).
 - Removed the unused `CTform_CreateAnalysis` command alias.
 - Release prep: version 1.0.0 in `package.xml` and `pyproject.toml`, CHANGELOG entry. Tag 1.0.0 is the author's.
+
+## Structured sheet mesh (branch agent/structured-sheet-mesh)
+- Workpiece property `StructuredSheetMesh` (default off) and `StructuredElementSize` (default 0.25 mm).
+  When on, the four-edge sheet face gets transfinite curves, a transfinite surface and a recombine
+  line injected after the Merge in the Gmsh geometry (`gmsh_package.structured_sheet_lines`,
+  `inject_after_merge`). Element counts come from the edge lengths; opposite edges must match and each
+  edge must be a whole number of elements.
+- Verified: unit test with Gmsh 4.15 gives 720 Quad4 for the 45 x 1 mm sheet; FreeCAD probe
+  (`CTFORM_PROBE_STRUCTURED=1`) gives 720 Quad4, 905 nodes, status ready, edge physical groups intact.
+- Blanks 90/100/110 mm (radius 45/50/55 mm) give 180/200/220 x 4 elements (Thay, Henrique's choice).
+- Curves are selected by FreeCAD edge index, the same tag GmshTools uses for the EdgeN physical groups,
+  so no bounding-box selection is used.

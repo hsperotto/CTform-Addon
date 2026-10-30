@@ -103,7 +103,7 @@ class CaseExportTests(unittest.TestCase):
             CaseFile="case.json",
         )
 
-        def fake_gmsh_export(mesh, output_path):
+        def fake_gmsh_export(mesh, output_path, **_options):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("native gmsh mesh", encoding="utf-8")
             return {

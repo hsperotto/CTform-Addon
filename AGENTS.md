@@ -15,7 +15,8 @@ recipes, review findings) read `docs/DEVELOPER-GUIDE.md`.
   (0 exports friction `none`), `CTFORM_PROBE_NO_HOLDER`, `CTFORM_PROBE_NO_AXIS`,
   `CTFORM_PROBE_INCREMENTS`, `CTFORM_PROBE_FORMULATION` (`flow` or `displacement`),
   `CTFORM_PROBE_MATERIAL` (catalog material name), `CTFORM_PROBE_QUAD=1` (recombined mesh),
-  `CTFORM_PROBE_ALGO2D` (Gmsh 2D algorithm, e.g. `Quasi-structured Quad`, which gives pure Quad4). It builds a
+  `CTFORM_PROBE_ALGO2D` (Gmsh 2D algorithm, e.g. `Quasi-structured Quad`, which gives pure Quad4),
+  `CTFORM_PROBE_STRUCTURED=1` (transfinite, recombined Quad4 sheet: 720 elements for the 45 x 1 mm probe). It builds a
   five-punch-style case (placeholder nose height) and prints what the export
   contains.
 

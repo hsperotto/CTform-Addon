@@ -131,6 +131,7 @@ def build():
     imported = {m.MaterialName: m for m in materials.import_material_catalog(doc, fem, case, CATALOG)}
     material_name = os.environ.get("CTFORM_PROBE_MATERIAL", "AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)")
     workpiece.Material = imported[material_name]
+    workpiece.StructuredSheetMesh = os.environ.get("CTFORM_PROBE_STRUCTURED") == "1"  # transfinite Quad4 sheet
     for tool in tools.values():
         tool.Material = imported["Rigid Tool Steel (placeholder)"]
 
