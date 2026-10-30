@@ -48,6 +48,7 @@ STROKE = 30.0
 PRESSURE_MPA = 5.0
 PRESS_SPEED = 19.5  # mm/s, Rocha (2022); not stated by Nunes
 WITH_HOLDER = os.environ.get("CTFORM_PROBE_NO_HOLDER") != "1"
+WITH_AXIS_BC = os.environ.get("CTFORM_PROBE_NO_AXIS") != "1"
 
 
 def arc(center, radius, start_deg, end_deg):
@@ -168,6 +169,21 @@ def build():
     fem.addObject(die_fixed)
     loadsteps.attach_condition(step, die_fixed)
 
+    if WITH_AXIS_BC:
+        # Core's flow formulation does not constrain the r = 0 axis by itself:
+        # fix the radial displacement (only X) on the sheet's axis edge.
+        axis_edge = next(
+            f"Edge{i}" for i, edge in enumerate(sheet.Shape.Edges, start=1)
+            if edge.BoundBox.XMax < 1e-9
+        )
+        axis_bc = ObjectsFem.makeConstraintDisplacement(doc, "AxisRadialFixed")
+        axis_bc.References = [(sheet, axis_edge)]
+        axis_bc.xFree = False
+        axis_bc.xDisplacement = "0 mm"
+        axis_bc.yFree = True
+        axis_bc.zFree = True
+        fem.addObject(axis_bc)
+        loadsteps.attach_condition(step, axis_bc)
     if not WITH_HOLDER:
         doc.recompute()
         return doc, case

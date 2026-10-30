@@ -37,6 +37,9 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   Solver `ExportTargetCompression` (off omits `run.targetCompression`);
   `analysis.apply_isothermal_preset(solver)`; headless probe
   `tests/freecad/probe_five_punch_export.py`.
+- Axisymmetric flow cases need a radial displacement BC of 0 on the r = 0 edge of the
+  sheet (Core's flow solver does not constrain the axis); the probe adds it as a
+  Displacement constraint on that edge (`Displacement`, `axis X`, `value 0`).
 - Run CTform Core command (Solver `CoreExecutable`): runs `ctform3_cli`, logs,
   and reports convergence, package warnings and step files (`core_runner.py`).
 - Contact interfaces name their master tool explicitly (`masterBody`,

@@ -460,3 +460,18 @@ error). The addon no longer exports `geometry.tools[].role` and removes the Tool
 `Role` property, including from older documents. A contact interface belongs to its
 master tool by name (`master.name` / `toolId`), unchanged. Draw tools clearly above
 or below the sheet.
+
+### 2026-10-30: First five-punch runs against Core 08e9ac4
+
+- A headless FreeCAD probe (`tests/freecad/probe_five_punch_export.py`) exports a
+cylindrical-punch case (placeholder gaps) in the industrial arrangement. The package is
+`ready`; Core reads it without warnings and resolves the three tools.
+- Core's flow solver needs a radial Displacement BC of 0 on the sheet's r = 0 edge
+(no automatic axis constraint); the probe exports it.
+- All runs (with/without blank holder and axis BC, 100 and 1000 increments) abort at
+the first increment in which the punch reaches the sheet
+(`line_search_failed_all_lambdas`). With a holder, its reported force overshoots to
+about 1.98 MN against 20.4 kN. Both are open on the Core side. Packages and logs:
+`C:\ctf-probes\five-punch\`.
+- FreeCAD's DXF exporter wrote small arcs (chord under about 10 mm in metres) as full
+CIRCLE entities; `dxf_writer.py` replaces it.
