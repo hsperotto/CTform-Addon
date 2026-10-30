@@ -111,6 +111,7 @@ class CTformSolver:
         string_properties = (
             ("OutputDirectory", "Output", "results_case"),
             ("ContactModel", "Contact", "node_to_segment"),
+            ("CoreExecutable", "External Tools", ""),
             ("GmshExecutable", "External Tools", ""),
             ("MmgDirectory", "External Tools", ""),
             ("AnalysisType", "Model", "CTform"),

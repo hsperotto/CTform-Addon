@@ -374,6 +374,95 @@ class CreateContactPairCommand:
         Gui.Selection.addSelection(pair)
 
 
+class RunCoreCommand:
+    """Run CTform Core on the exported case package."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": _ICON_SOLVER,
+            "MenuText": "Run CTform Core",
+            "ToolTip": "Run CTform Core on the exported case.json and report the result",
+        }
+
+    def IsActive(self):
+        return App.ActiveDocument is not None and find_case(App.ActiveDocument) is not None
+
+    def Activated(self):
+        case = find_case(App.ActiveDocument)
+        solver = find_solver(case)
+        window = Gui.getMainWindow()
+        package = Path(case.CaseDirectory) / (case.CaseFile or "case.json") if case.CaseDirectory else None
+        if package is None or not package.is_file():
+            QtWidgets.QMessageBox.warning(
+                window, "Run CTform Core", "Export the CTform case first; no case.json was found."
+            )
+            return
+        executable = str(getattr(solver, "CoreExecutable", "") or os.environ.get("CTFORM_CORE", ""))
+        if not executable or not Path(executable).is_file():
+            QtWidgets.QMessageBox.warning(
+                window,
+                "Run CTform Core",
+                "Set the Solver property CoreExecutable to ctform3_cli.exe "
+                "(or set the CTFORM_CORE environment variable).",
+            )
+            return
+        output = package.parent / (getattr(solver, "OutputDirectory", "") or "results_case")
+        self._start(package, executable, output, solver, window)
+
+    def _start(self, package, executable, output, solver, window):
+        import threading
+
+        from PySide import QtCore
+
+        from .core_runner import run_core
+
+        outcome = {}
+
+        def work():
+            try:
+                outcome["result"] = run_core(
+                    executable,
+                    package,
+                    output,
+                    gmsh=str(getattr(solver, "GmshExecutable", "") or "") or None,
+                    mmg_directory=str(getattr(solver, "MmgDirectory", "") or "") or None,
+                )
+            except (OSError, ValueError) as error:
+                outcome["error"] = error
+
+        thread = threading.Thread(target=work, daemon=True)
+        thread.start()
+        App.Console.PrintMessage(f"CTform: running Core on {package} ...\n")
+        timer = QtCore.QTimer()
+        timer.setInterval(1000)
+
+        def poll():
+            if thread.is_alive():
+                return
+            timer.stop()
+            self._report(outcome, window)
+
+        timer.timeout.connect(poll)
+        timer.start()
+        self._timer = timer
+
+    def _report(self, outcome, window):
+        if "error" in outcome:
+            QtWidgets.QMessageBox.warning(window, "Run CTform Core", str(outcome["error"]))
+            return
+        result = outcome["result"]
+        for warning in result.warnings:
+            App.Console.PrintWarning(f"CTform Core: {warning}\n")
+        summary = (
+            f"converged: {'yes' if result.finished else 'no'}; "
+            f"{len(result.steps)} step file(s); log: {result.log_file}"
+        )
+        if result.timed_out:
+            summary += "; the process was stopped after the time limit"
+        App.Console.PrintMessage(f"CTform Core finished: {summary}\n")
+        QtWidgets.QMessageBox.information(window, "Run CTform Core", summary.replace("; ", "\n"))
+
+
 class ExportCaseCommand:
     """Export the active CTform case settings to case.json."""
 
@@ -642,6 +731,7 @@ Gui.addCommand("CTform_AssignMaterial", AssignMaterialCommand())
 Gui.addCommand("CTform_AssignMesh", AssignMeshCommand())
 Gui.addCommand("CTform_CreateContactPair", CreateContactPairCommand())
 Gui.addCommand("CTform_ExportCase", ExportCaseCommand())
+Gui.addCommand("CTform_RunCore", RunCoreCommand())
 Gui.addCommand("CTform_CreateWorkpiece", CreateWorkpieceCommand())
 Gui.addCommand("CTform_CreateTool", CreateToolCommand())
 Gui.addCommand("CTform_CreateLoadStep", CreateLoadStepCommand())

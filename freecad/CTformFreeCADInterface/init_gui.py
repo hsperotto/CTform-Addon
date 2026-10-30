@@ -35,6 +35,7 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"CTform_CloneLoadStep",
 				"CTform_CreateSolver",
 				"CTform_ExportCase",
+				"CTform_RunCore",
 			],
 		)
 		self.appendMenu(
@@ -47,6 +48,7 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"CTform_CloneLoadStep",
 				"CTform_CreateSolver",
 				"CTform_ExportCase",
+				"CTform_RunCore",
 			],
 		)
 		self.appendMenu(
