@@ -153,7 +153,7 @@ def build():
         pair.FrictionModel = "coulomb" if FRICTION > 0 else "none"
         pair.FrictionCoefficient = FRICTION
 
-    total = PUNCH_GAP + STROKE
+    total = float(os.environ.get("CTFORM_PROBE_TOTAL_TRAVEL", PUNCH_GAP + STROKE))  # mm
     duration = total / PRESS_SPEED
     step = loadsteps.make_load_step(doc, fem)
     step.StepName = "Press"
