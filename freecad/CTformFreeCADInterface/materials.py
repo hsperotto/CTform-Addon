@@ -52,6 +52,10 @@ class CTformMaterial:
         add_property(obj, "NortonHoffM", "App::PropertyFloat", "Norton-Hoff", 0.0)
         add_property(obj, "YieldStress", "App::PropertyPressure", "Elastoplastic", 0.0)
         add_property(obj, "HardeningModulus", "App::PropertyPressure", "Elastoplastic", 0.0)
+        # Swift hardening: sigma_y = K (eps0 + epsP)^n with eps0 = (Rp0.2 / K)^(1/n).
+        add_property(obj, "SwiftK", "App::PropertyPressure", "Elastoplastic", 0.0)
+        add_property(obj, "SwiftN", "App::PropertyFloat", "Elastoplastic", 0.0)
+        add_property(obj, "YieldStrength02", "App::PropertyPressure", "Elastoplastic", 0.0)
         add_property(obj, "YoungModulus", "App::PropertyPressure", "Elastic", 0.0)
         add_property(obj, "PoissonRatio", "App::PropertyFloat", "Elastic", 0.3)
         add_property(obj, "Density", "App::PropertyDensity", "Thermal", 0.0)
@@ -215,6 +219,17 @@ def _apply_material_record(material, record: dict[str, Any]) -> None:
     for key, (property_name, unit) in parameter_fields.get(model, {}).items():
         if key in parameters:
             _set_imported_value(material, property_name, parameters[key], unit)
+    if model == "ElastoPlasticIsotropic" and "K" in parameters:
+        _set_imported_value(material, "SwiftK", parameters["K"], "Pa")
+        material.SwiftN = float(parameters.get("n", 0.0))
+        if "yieldStrength02" in parameters:
+            yield_02 = float(parameters["yieldStrength02"])
+        elif "eps0" in parameters:
+            # Rp0.2 = K * eps0^n is the inverse of swift_eps0.
+            yield_02 = float(parameters["K"]) * float(parameters["eps0"]) ** float(parameters["n"])
+        else:
+            yield_02 = 0.0
+        _set_imported_value(material, "YieldStrength02", yield_02, "Pa")
 
     elastic = record["elastic"]
     _set_imported_value(material, "YoungModulus", elastic.get("youngModulus", 0.0), "Pa")
@@ -339,6 +354,11 @@ def material_readiness_issues(catalog: dict[str, Any]) -> list[str]:
                 f"Material {name!r}: the flow-stress table must list every temperature x "
                 "strain rate x strain combination exactly once."
             )
+        elif model == "ElastoPlasticIsotropic" and "K" in parameters:
+            if not (parameters.get("K", 0.0) > 0.0 and 0.0 < parameters.get("n", 0.0) < 1.0):
+                issues.append(f"Material {name!r} needs K > 0 and 0 < n < 1 for Swift hardening.")
+            elif parameters.get("eps0", 0.0) <= 0.0 and parameters.get("yieldStrength02", 0.0) <= 0.0:
+                issues.append(f"Material {name!r} needs eps0 or Rp0.2 for Swift hardening.")
         if elastic.get("youngModulus", 0.0) <= 0.0:
             issues.append(f"Material {name!r} needs a positive Young's modulus.")
         poisson_ratio = elastic.get("poissonRatio", 0.3)
@@ -362,7 +382,31 @@ def _is_complete_flow_stress_grid(table) -> bool:
     return len(set(keys)) == len(keys) == axes[0] * axes[1] * axes[2]
 
 
+def swift_eps0(yield_strength_02: float, K: float, n: float) -> float:
+    """Return the Swift pre-strain eps0 = (Rp0.2 / K)^(1/n).
+
+    With this eps0, K (eps0 + epsP)^n equals Rp0.2 at zero plastic strain, which is
+    the convention of the thesis. Core floors eps0 at the elastic-line intersection
+    (about 4.8e-4) when it is absent, so it must be exported explicitly.
+    """
+    if K <= 0.0 or not 0.0 < n < 1.0 or yield_strength_02 <= 0.0:
+        raise ValueError("Swift hardening needs K > 0, 0 < n < 1 and a positive Rp0.2")
+    eps0 = (yield_strength_02 / K) ** (1.0 / n)
+    if eps0 >= 1.0:
+        raise ValueError("Swift hardening: Rp0.2 must be smaller than K")
+    return eps0
+
+
+def _swift_enabled(material: object) -> bool:
+    return _quantity_si(material, "SwiftK", "Pa") > 0.0
+
+
 def _constitutive_parameters(material: object, model: str) -> dict[str, float]:
+    if model == "ElastoPlasticIsotropic" and _swift_enabled(material):
+        K = _quantity_si(material, "SwiftK", "Pa")
+        n = float(getattr(material, "SwiftN", 0.0))
+        yield_02 = _quantity_si(material, "YieldStrength02", "Pa")
+        return {"K": K, "n": n, "eps0": swift_eps0(yield_02, K, n)}
     fields = {
         "HenselSpittel": {
             "A": ("HenselSpittelA", "Pa"),

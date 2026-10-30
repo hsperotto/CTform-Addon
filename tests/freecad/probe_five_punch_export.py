@@ -82,7 +82,7 @@ def build():
     solver = analysis.make_solver(doc, case)
     solver.Dimension = "2D"
     solver.ModelingType = "axisymmetric"
-    solver.MechanicalFormulation = "flow"
+    solver.MechanicalFormulation = os.environ.get("CTFORM_PROBE_FORMULATION", "flow")
     analysis.apply_isothermal_preset(solver)
     solver.ExportTargetCompression = False  # the run ends when its load steps end
 
@@ -129,7 +129,8 @@ def build():
         tools["BlankHolder"] = components.make_tool(doc, fem, case, holder, "BlankHolder")
 
     imported = {m.MaterialName: m for m in materials.import_material_catalog(doc, fem, case, CATALOG)}
-    workpiece.Material = imported["AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)"]
+    material_name = os.environ.get("CTFORM_PROBE_MATERIAL", "AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)")
+    workpiece.Material = imported[material_name]
     for tool in tools.values():
         tool.Material = imported["Rigid Tool Steel (placeholder)"]
 
@@ -137,6 +138,9 @@ def build():
     mesh.Shape = sheet
     mesh.ElementDimension = "2D"
     mesh.ElementOrder = "1st"
+    mesh.RecombineAll = os.environ.get("CTFORM_PROBE_QUAD") == "1"  # structured Quad4 for displacement runs
+    if os.environ.get("CTFORM_PROBE_ALGO2D"):
+        mesh.Algorithm2D = os.environ["CTFORM_PROBE_ALGO2D"]
     mesh.CharacteristicLengthMax = "0.25 mm"
     mesh.CharacteristicLengthMin = "0.1 mm"
     workpiece.Mesh = mesh

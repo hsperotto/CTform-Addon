@@ -13,7 +13,9 @@ recipes, review findings) read `docs/DEVELOPER-GUIDE.md`.
   `set CTFORM_PROBE_OUT=<folder>` then
   `FreeCADCmd.exe tests/freecad/probe_five_punch_export.py`. Optional switches: `CTFORM_PROBE_PUNCH_GAP` (mm), `CTFORM_PROBE_MU`
   (0 exports friction `none`), `CTFORM_PROBE_NO_HOLDER`, `CTFORM_PROBE_NO_AXIS`,
-  `CTFORM_PROBE_INCREMENTS`. It builds a
+  `CTFORM_PROBE_INCREMENTS`, `CTFORM_PROBE_FORMULATION` (`flow` or `displacement`),
+  `CTFORM_PROBE_MATERIAL` (catalog material name), `CTFORM_PROBE_QUAD=1` (recombined mesh),
+  `CTFORM_PROBE_ALGO2D` (Gmsh 2D algorithm, e.g. `Quasi-structured Quad`, which gives pure Quad4). It builds a
   five-punch-style case (placeholder nose height) and prints what the export
   contains.
 

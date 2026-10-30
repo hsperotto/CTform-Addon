@@ -19,6 +19,9 @@ from .properties import length_to_si
 
 
 SCHEMA_VERSION = 2
+# Set to True when Core's v2 ElastoPlasticIsotropic reads K, n and eps0 (Swift hardening).
+# Core master does not read them yet; Cody's change is on agent/cm1-friction-tangent.
+CORE_SWIFT_SUPPORTED = False
 SI_UNITS = {
     "length": "m",
     "time": "s",
@@ -226,10 +229,23 @@ def _core_v2_unsupported_issues(
     issues = []
     if solver is not None and _value(solver, "RemeshEnabled", False):
         issues.append("Core v2 does not support remeshing yet; disable Remesh on the Solver.")
-    if "Tri3" in ((mesh_info or {}).get("elementTypes") or ()) and "Quad4" in (
-        (mesh_info or {}).get("elementTypes") or ()
-    ):
+    element_types = set((mesh_info or {}).get("elementTypes") or ())
+    if {"Tri3", "Quad4"} <= element_types:
         issues.append("Core v2 does not support meshes that mix Tri3 and Quad4 elements.")
+    formulation = str(_value(solver, "MechanicalFormulation", "flow")) if solver is not None else "flow"
+    if formulation == "displacement" and element_types and element_types != {"Quad4"}:
+        issues.append(
+            "The displacement formulation needs a pure Quad4 mesh; Core rejects Tri3 for it. "
+            "Mesh the Workpiece with Quad4 elements."
+        )
+    if not CORE_SWIFT_SUPPORTED:
+        for record in (material_catalog or {}).get("materials", ()):
+            constitutive = record.get("constitutive", {})
+            if constitutive.get("model") == "ElastoPlasticIsotropic" and "eps0" in constitutive.get("parameters", {}):
+                issues.append(
+                    f"Material {record.get('name', record.get('id'))!r} uses Swift hardening (K, n, eps0), "
+                    "which Core master does not read yet; the export waits for the Core change."
+                )
     groups = (mesh_info or {}).get("physicalGroups")
     steps = list(getattr(case, "LoadSteps", ()) or ())
     for step in steps:

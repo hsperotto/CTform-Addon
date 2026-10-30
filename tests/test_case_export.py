@@ -945,9 +945,10 @@ class CaseExportTests(unittest.TestCase):
             SimpleNamespace(RemeshEnabled=True, MechanicalFormulation="displacement"),
         )
 
-        self.assertEqual(len(issues), 6)  # includes the whole-body convection
+        self.assertEqual(len(issues), 7)  # includes the whole-body convection and the Quad4-only rule
         self.assertTrue(any("Remesh" in issue for issue in issues))
         self.assertTrue(any("Tri3 and Quad4" in issue for issue in issues))
+        self.assertTrue(any("pure Quad4" in issue for issue in issues))
         self.assertTrue(any("CFlux" in issue for issue in issues))
         self.assertTrue(any("Total Power" in issue for issue in issues))
         self.assertTrue(any("only allowed on Tools" in issue for issue in issues))

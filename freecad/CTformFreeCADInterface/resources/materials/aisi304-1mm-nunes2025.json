@@ -94,6 +94,94 @@
       }
     },
     {
+      "id": "aisi304-1mm-ep-rd0",
+      "name": "AISI 304 1 mm, 0 deg, Swift elastoplastic (Nunes 2025)",
+      "constitutive": {
+        "model": "ElastoPlasticIsotropic",
+        "parameters": {
+          "K": 1318300000.0,
+          "n": 0.35,
+          "yieldStrength02": 217000000.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
+      "id": "aisi304-1mm-ep-rd45",
+      "name": "AISI 304 1 mm, 45 deg, Swift elastoplastic (Nunes 2025)",
+      "constitutive": {
+        "model": "ElastoPlasticIsotropic",
+        "parameters": {
+          "K": 1198400000.0,
+          "n": 0.33,
+          "yieldStrength02": 206000000.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
+      "id": "aisi304-1mm-ep-rd90",
+      "name": "AISI 304 1 mm, 90 deg, Swift elastoplastic (Nunes 2025)",
+      "constitutive": {
+        "model": "ElastoPlasticIsotropic",
+        "parameters": {
+          "K": 1232300000.0,
+          "n": 0.34,
+          "yieldStrength02": 210000000.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
+      "id": "aisi304-1mm-ep-mean",
+      "name": "AISI 304 1 mm, mean, Swift elastoplastic (Nunes 2025)",
+      "constitutive": {
+        "model": "ElastoPlasticIsotropic",
+        "parameters": {
+          "K": 1249666666.667,
+          "n": 0.34,
+          "yieldStrength02": 211000000.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
       "id": "rigid-tool-steel",
       "name": "Rigid Tool Steel (placeholder)",
       "constitutive": {

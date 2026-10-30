@@ -68,6 +68,9 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   `line_search_failed_all_lambdas`) on Core `08e9ac4`. Core task C-M1 (friction treatment in the
   flow formulation). Probe packages: `C:\ctf-probes\five-punch`.
 - Per-pair penalty (`normal.penalty`) is exported but Core v2 ignores it until Core accepts the key.
+- Swift hardening (K, n, eps0 under `ElastoPlasticIsotropic`, eps0 = (Rp0.2/K)^(1/n)) is built on
+  `agent/swift-elastoplastic`. The export is marked draft by `CORE_SWIFT_SUPPORTED = False` in
+  `case_export.py` until Cody's change is merged on Core master; flip the flag then.
 
 ## Core reference (checked 2026-10-30)
 - Core `master` contains `agent/v2-thermal-bcs` (a462978 and later), so the earlier wait on that

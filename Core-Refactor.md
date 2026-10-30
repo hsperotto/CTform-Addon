@@ -494,3 +494,19 @@ only along Z for now).
   exported as `contactInterfaces[].normal.penalty`. Core's v2 normalizer drops that key
   today, so it has no effect until Core accepts it; it is an optional field and does not
   change `SCHEMA_VERSION`.
+
+### 2026-10-30: Swift hardening and displacement runs (addon side, not yet accepted by Core master)
+
+- `ElastoPlasticIsotropic` with `K`, `n`, `eps0` (Pa, -, -) is Swift hardening,
+  sigma_y = K (eps0 + epsP)^n. The addon exports `eps0 = (Rp0.2 / K)^(1/n)` computed in code
+  from the catalog's `yieldStrength02`; it never hard-codes eps0 and never relies on Core's
+  default (about 4.8e-4 from the elastic-line intersection). Without `K`, the linear form
+  (`yieldStress`, `hardeningModulus`) is kept. Names are the Hollomon names, not `Swift*`.
+- `mechanicalFormulation: "displacement"` requires a pure Quad4 mesh (readiness reports
+  Tri3). The axisymmetric axis BC (radial displacement 0 on the r = 0 edge) stays an explicit
+  BC of the case; per Cody's report, Core no longer pins u_r of the first nodes in the
+  displacement solver.
+- Catalog: `aisi304-1mm-ep-{rd0,rd45,rd90,mean}` with Rp0.2 217 / 206 / 210 / 211 MPa (Nunes
+  Table 3; mean is arithmetic). E = 200 GPa, nu = 0.3.
+- Export is marked draft (`CORE_SWIFT_SUPPORTED = False`) until Core master reads the Swift
+  parameters (Cody, agent/cm1-friction-tangent, not merged). Flip the flag with that change.
