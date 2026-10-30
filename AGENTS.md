@@ -7,6 +7,12 @@ Read `STATUS.md` first, then `DEVELOPMENT-CONTEXT.md` (design rules) and
 - Run: `python -m unittest discover -s tests`. pytest is not installed.
 - All tests must pass before you merge or hand off.
 
+- FreeCAD probe (needs FreeCADCmd and FreeCAD's gmsh; not run by unittest):
+  `set CTFORM_PROBE_OUT=<folder>` then
+  `FreeCADCmd.exe tests/freecad/probe_five_punch_export.py`. It builds a
+  five-punch-style case (placeholder nose height) and prints what the export
+  contains.
+
 ## Workflow
 - FreeCAD loads this directory directly, so keep the checked-out branch on a clean `main`.
 - Do half-finished work on an `agent/<topic>` branch and merge only when tests pass.

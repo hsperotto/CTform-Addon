@@ -27,9 +27,21 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   never exported. An axisymmetric Tool force with a radial component is a
   readiness error. Tool `Role` is optional and no longer required for forces.
 - Solver `GmshExecutable` / `MmgDirectory` export `run.externalTools` when set.
+- DXF export no longer uses FreeCAD's exporter: it wrote any arc with a chord
+  shorter than ~1e-2 units (every R6 mm corner, exported in metres) as a full
+  CIRCLE. `dxf_writer.py` writes exact LINE/ARC/CIRCLE (other curves are
+  discretized).
+- Five-punch preparation (industrial arrangement): AISI 304 catalog in
+  `resources/materials/aisi304-1mm-nunes2025.json` (Hollomon K/n for 0/45/90 deg
+  and the mean, E/nu/rho from Rocha 2022; thermal values are placeholders);
+  Solver `ExportTargetCompression` (off omits `run.targetCompression`);
+  `analysis.apply_isothermal_preset(solver)`; headless probe
+  `tests/freecad/probe_five_punch_export.py`.
+- Run CTform Core command (Solver `CoreExecutable`): runs `ctform3_cli`, logs,
+  and reports convergence, package warnings and step files (`core_runner.py`).
 - Contact interfaces name their master tool explicitly (`masterBody`,
   `masterToolId`, `master.name/toolId`) and the workpiece slave group.
-- 62 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- 77 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
