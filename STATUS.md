@@ -69,3 +69,6 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 ## Blocked
 - Running cases with Core `master`: the v2 reader and the `-ffast-math` tool
   motion fix exist only on Core `agent/*` branches.
+
+## Release prep (branch agent/release-prep)
+- Version fields set to 1.0.0 and CHANGELOG.md written. The author creates the tag; merge only on the author's yes.
