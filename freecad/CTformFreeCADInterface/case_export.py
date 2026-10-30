@@ -15,6 +15,7 @@ from .contacts import contact_pair_to_dict
 from .gmsh_package import export_gmsh_mesh
 from .geometry_export import export_component_geometry
 from .json_export import dumps_si
+from .properties import length_to_si
 
 
 SCHEMA_VERSION = 2
@@ -75,12 +76,12 @@ def case_to_dict(
         "mesh": mesh_info or {},
         "contact": {
             "model": _value(solver, "ContactModel", "node_to_segment"),
-            "initialGap": _length_to_si(_value(solver, "InitialGap", 0.05)),
+            "initialGap": length_to_si(_value(solver, "InitialGap", 0.05)),
             "augmentedLagrangeEnabled": _value(solver, "AugmentedLagrangeEnabled", True),
-            "penetrationTolerance": _length_to_si(_value(solver, "PenetrationTolerance", 1e-2)),
-            "gapTolerance": _length_to_si(_value(solver, "GapTolerance", 1e-6)),
+            "penetrationTolerance": length_to_si(_value(solver, "PenetrationTolerance", 1e-2)),
+            "gapTolerance": length_to_si(_value(solver, "GapTolerance", 1e-6)),
             "thermalContactEnabled": _value(solver, "ThermalContactEnabled", False),
-            "zBottom": _length_to_si(_value(solver, "ZBottom", 0.0)),
+            "zBottom": length_to_si(_value(solver, "ZBottom", 0.0)),
         },
         "contactInterfaces": [
             contact_pair_to_dict(pair, (mesh_info or {}).get("physicalGroups"))
@@ -346,7 +347,7 @@ def _target_compression(solver: object | None) -> dict[str, Any]:
     """Workpiece compression target; omitted for sheet cases that run to the end of their steps."""
     if not _value(solver, "ExportTargetCompression", True):
         return {}
-    return {"targetCompression": _length_to_si(_value(solver, "TargetCompression", 7.0))}
+    return {"targetCompression": length_to_si(_value(solver, "TargetCompression", 7.0))}
 
 
 def _external_tools(solver: object | None) -> dict[str, Any]:
@@ -384,7 +385,7 @@ def thermal_to_dict(case: object, physical_groups=None) -> dict[str, Any]:
         "frictionHeatPartitionToWorkpiece": _value(
             solver, "FrictionHeatPartitionToWorkpiece", 1.0
         ),
-        "frictionHeatLayerDepth": _length_to_si(_value(solver, "FrictionHeatLayerDepth", 0.5)),
+        "frictionHeatLayerDepth": length_to_si(_value(solver, "FrictionHeatLayerDepth", 0.5)),
         "frictionHeatDistribution": _value(solver, "FrictionHeatDistribution", "uniform"),
         "initialTemperature": {
             "workpiece": _value(solver, "InitialWorkpieceTemperature", 293.15),
@@ -867,7 +868,7 @@ def _condition_target_data(condition: object, physical_groups=None) -> list[dict
             {
                 "target": str(target),
                 "useZSelector": getattr(condition, "UseZSelector", False),
-                "zSelector": _length_to_si(getattr(condition, "ZSelector", 0.0)),
+                "zSelector": length_to_si(getattr(condition, "ZSelector", 0.0)),
             }
         ]
     references = getattr(condition, "References", ()) or ()
@@ -920,7 +921,7 @@ def _condition_target_data(condition: object, physical_groups=None) -> list[dict
 
     if max(z_values) - min(z_values) > 1e-7:
         raise ValueError("Selected FEM edges span multiple axial coordinates")
-    return [{"target": "All", "useZSelector": True, "zSelector": _length_to_si(z_values[0])}]
+    return [{"target": "All", "useZSelector": True, "zSelector": length_to_si(z_values[0])}]
 
 
 def _unique_target_dicts(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1146,16 +1147,8 @@ def _geometry_from_components(
             "materialId": material_id,
         }
         tool["toolLayer"] = getattr(tool_component, "ToolLayer", "") or "ToolProfile"
-        tool["initialOffsetZ"] = _length_to_si(getattr(tool_component, "InitialOffsetZ", 0.0))
-        tool["symmetryR"] = _length_to_si(getattr(tool_component, "SymmetryR", 0.0))
+        tool["initialOffsetZ"] = length_to_si(getattr(tool_component, "InitialOffsetZ", 0.0))
+        tool["symmetryR"] = length_to_si(getattr(tool_component, "SymmetryR", 0.0))
         geometry["tools"].append(tool)
     return geometry
-
-
-def _length_to_si(value: object) -> float:
-    if hasattr(value, "getValueAs"):
-        return float(value.getValueAs("m"))
-    return float(value) * 1e-3
-
-
 

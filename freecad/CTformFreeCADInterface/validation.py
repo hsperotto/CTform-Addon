@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # SPDX-FileNotice: Part of the CTform FreeCAD Interface addon.
 
-"""Validation helpers for the CTform 2D model contract."""
+"""Validation helpers for the CTform 2D model contract.
+
+Not used by the workbench yet. Kept for the geometry preflight planned in STATUS.md
+(Next, item 4); only the tests import it.
+"""
 
 from dataclasses import dataclass
 from typing import Iterable

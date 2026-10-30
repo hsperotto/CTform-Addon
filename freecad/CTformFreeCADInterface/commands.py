@@ -426,6 +426,8 @@ class RunCoreCommand:
         # The result goes to the document that was active when the run started.
         doc = App.ActiveDocument
         outcome = {}
+        minutes = float(getattr(solver, "CoreTimeoutMinutes", 0.0) or 0.0)
+        timeout = minutes * 60.0 if minutes > 0 else None
 
         def work():
             try:
@@ -435,6 +437,7 @@ class RunCoreCommand:
                     output,
                     gmsh=str(getattr(solver, "GmshExecutable", "") or "") or None,
                     mmg_directory=str(getattr(solver, "MmgDirectory", "") or "") or None,
+                    timeout=timeout,
                 )
             except Exception as error:  # any failure must reach the GUI, not kill the thread silently
                 outcome["error"] = error
@@ -778,4 +781,3 @@ Gui.addCommand("CTform_CreateLoadStep", CreateLoadStepCommand())
 Gui.addCommand("CTform_CloneLoadStep", CloneLoadStepCommand())
 Gui.addCommand("CTform_AttachConditionToStep", AttachConditionToStepCommand())
 Gui.addCommand("CTform_DetachConditionFromStep", DetachConditionFromStepCommand())
-Gui.addCommand("CTform_CreateAnalysis", CreateCaseCommand())

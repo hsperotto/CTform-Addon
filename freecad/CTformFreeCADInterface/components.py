@@ -5,6 +5,7 @@
 
 from .identifiers import readable_id
 from .viewproviders import attach_view_provider
+from .properties import add_property
 
 
 class CTformWorkpiece:
@@ -27,11 +28,11 @@ class CTformWorkpiece:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "Shape", "App::PropertyLink", "Component", None)
-        _add(obj, "Mesh", "App::PropertyLink", "Component", None)
-        _add(obj, "Material", "App::PropertyLink", "Component", None)
-        _add(obj, "ContactPairs", "App::PropertyLinkList", "Contact", [])
-        _add(obj, "MeshFile", "App::PropertyString", "Export", "workpiece.msh")
+        add_property(obj, "Shape", "App::PropertyLink", "Component", None)
+        add_property(obj, "Mesh", "App::PropertyLink", "Component", None)
+        add_property(obj, "Material", "App::PropertyLink", "Component", None)
+        add_property(obj, "ContactPairs", "App::PropertyLinkList", "Contact", [])
+        add_property(obj, "MeshFile", "App::PropertyString", "Export", "workpiece.msh")
 
 
 class CTformTool:
@@ -54,18 +55,18 @@ class CTformTool:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "ToolId", "App::PropertyString", "Identity", "")
-        _add(obj, "ToolName", "App::PropertyString", "Identity", "Tool")
-        _add(obj, "Shape", "App::PropertyLink", "Component", None)
-        _add(obj, "Mesh", "App::PropertyLink", "Component", None)
-        _add(obj, "Material", "App::PropertyLink", "Component", None)
+        add_property(obj, "ToolId", "App::PropertyString", "Identity", "")
+        add_property(obj, "ToolName", "App::PropertyString", "Identity", "Tool")
+        add_property(obj, "Shape", "App::PropertyLink", "Component", None)
+        add_property(obj, "Mesh", "App::PropertyLink", "Component", None)
+        add_property(obj, "Material", "App::PropertyLink", "Component", None)
         # Core derives each tool's side from its geometry; older documents
         # still carry the removed Role setting.
         if "Role" in obj.PropertiesList:
             obj.removeProperty("Role")
-        _add(obj, "ToolLayer", "App::PropertyString", "Export", "ToolProfile")
-        _add(obj, "InitialOffsetZ", "App::PropertyFloat", "Export", 0.0)
-        _add(obj, "SymmetryR", "App::PropertyFloat", "Export", 0.0)
+        add_property(obj, "ToolLayer", "App::PropertyString", "Export", "ToolProfile")
+        add_property(obj, "InitialOffsetZ", "App::PropertyFloat", "Export", 0.0)
+        add_property(obj, "SymmetryR", "App::PropertyFloat", "Export", 0.0)
 
 
 def make_workpiece(doc, analysis, case, shape, name="CTformWorkpiece"):
@@ -115,9 +116,3 @@ def make_tool(
     attach_view_provider(obj)
     return obj
 
-
-def _add(obj, name, property_type, group, default):
-    if name not in obj.PropertiesList:
-        obj.addProperty(property_type, name, group)
-        if default is not None:
-            setattr(obj, name, default)

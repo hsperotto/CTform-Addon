@@ -124,7 +124,8 @@ def run_core(
     """Run Core to completion, logging its console output.
 
     Core can hang at process exit (Gmsh DLL) after it wrote its results, so a
-    timeout does not discard a log that already says converged=1.
+    timeout does not discard a log that already says converged=1. The timeout
+    kills the process that was started; a launcher script's children are not killed.
     """
     executable = Path(core_executable)
     if not executable.is_file():

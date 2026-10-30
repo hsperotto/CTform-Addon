@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from .identifiers import readable_id
+from .properties import add_property, length_to_si
 
 
 class CTformContactPair:
@@ -23,20 +24,20 @@ class CTformContactPair:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "PairId", "App::PropertyString", "Identity", "")
-        _add(obj, "PairName", "App::PropertyString", "Contact", "Workpiece Tool Contact")
-        _add(obj, "Tool", "App::PropertyLink", "Contact", None)
-        _add(obj, "SlavePhysicalGroup", "App::PropertyString", "Contact", "All")
-        _add(obj, "MasterPhysicalGroup", "App::PropertyString", "Contact", "")
-        _add(obj, "GapTolerance", "App::PropertyLength", "Normal", 0.0)
-        _add(obj, "Penalty", "App::PropertyFloat", "Normal", 0.0)  # 0 = Core default
-        _add(obj, "FrictionModel", "App::PropertyEnumeration", "Friction", ["coulomb", "levanov", "tresca", "none"])
-        _add(obj, "FrictionCoefficient", "App::PropertyFloat", "Friction", 0.3)
-        _add(obj, "LevanovM", "App::PropertyFloat", "Friction", 0.3)
-        _add(obj, "LevanovN", "App::PropertyFloat", "Friction", 1.25)
-        _add(obj, "ThermalEnabled", "App::PropertyBool", "Thermal Contact", False)
-        _add(obj, "HeatTransferCoefficient", "App::PropertyFloat", "Thermal Contact", 0.0)
-        _add(obj, "Active", "App::PropertyBool", "Contact", True)
+        add_property(obj, "PairId", "App::PropertyString", "Identity", "")
+        add_property(obj, "PairName", "App::PropertyString", "Contact", "Workpiece Tool Contact")
+        add_property(obj, "Tool", "App::PropertyLink", "Contact", None)
+        add_property(obj, "SlavePhysicalGroup", "App::PropertyString", "Contact", "All")
+        add_property(obj, "MasterPhysicalGroup", "App::PropertyString", "Contact", "")
+        add_property(obj, "GapTolerance", "App::PropertyLength", "Normal", 0.0)
+        add_property(obj, "Penalty", "App::PropertyFloat", "Normal", 0.0)  # 0 = Core default
+        add_property(obj, "FrictionModel", "App::PropertyEnumeration", "Friction", ["coulomb", "levanov", "tresca", "none"])
+        add_property(obj, "FrictionCoefficient", "App::PropertyFloat", "Friction", 0.3)
+        add_property(obj, "LevanovM", "App::PropertyFloat", "Friction", 0.3)
+        add_property(obj, "LevanovN", "App::PropertyFloat", "Friction", 1.25)
+        add_property(obj, "ThermalEnabled", "App::PropertyBool", "Thermal Contact", False)
+        add_property(obj, "HeatTransferCoefficient", "App::PropertyFloat", "Thermal Contact", 0.0)
+        add_property(obj, "Active", "App::PropertyBool", "Contact", True)
 
     def onDocumentRestored(self, obj=None):
         if obj is not None:
@@ -111,7 +112,7 @@ def contact_pair_to_dict(pair, mesh_groups=None):
         "masterBody": master_name,
         "masterToolId": master_tool_id,
         "masterPhysicalGroup": master_group,
-        "gapTolerance": _length_to_si(getattr(pair, "GapTolerance", 0.0)),
+        "gapTolerance": length_to_si(getattr(pair, "GapTolerance", 0.0)),
         "friction": {
             "type": str(getattr(pair, "FrictionModel", "coulomb")),
             "coefficient": float(getattr(pair, "FrictionCoefficient", 0.3)),
@@ -130,18 +131,3 @@ def contact_pair_to_dict(pair, mesh_groups=None):
         record["normal"] = {"penalty": penalty}
     return record
 
-
-def _length_to_si(value):
-    if hasattr(value, "getValueAs"):
-        return float(value.getValueAs("m"))
-    return float(value) * 1e-3
-
-
-def _add(obj, name, property_type, group, default):
-    if name not in obj.PropertiesList:
-        obj.addProperty(property_type, name, group)
-        if property_type == "App::PropertyEnumeration":
-            setattr(obj, name, default)
-            setattr(obj, name, default[0])
-        elif default is not None:
-            setattr(obj, name, default)

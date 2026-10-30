@@ -53,30 +53,32 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   installed on the PC).
 
 ## In progress
-- Branch `agent/core-thermal-force-sync` (this work) must merge into addon
-  `main` only after Core `agent/v2-thermal-bcs` is merged into Core `master`.
-  Core `master` still rejects these thermal BCs, workpiece forces and
-  TabulatedFlowStress, and refuses packages with readiness issues.
+- Nothing open on the addon side. Merged branches stay on origin until the author deletes them.
 
 ## Next
-1. Fresh interactive run of `MANUAL-SMOKE-TEST.md` in FreeCAD; renumber old
-   StepIds, set Solver initial temperatures, re-export SmokeTest.
-2. Run the exported SmokeTest with Core `agent/v2-thermal-bcs` end to end.
+1. Fresh interactive run of `MANUAL-SMOKE-TEST.md` in FreeCAD. Restart FreeCAD first to pick up
+   the icons and the Run CTform Core command.
+2. Run the SmokeTest package with Core `master` (the v2 reader and the v2 thermal/force BCs are in it).
 3. Validate contact-pair physical-group references; add conflict diagnostics.
-4. Harden SI geometry export and preflight for more CAD shapes.
-5. Minimal solver run command (invoke `ctform3_cli`, pass `--tune` options).
+4. Geometry preflight: wire `validation.py` into the export, or delete it.
+5. Check Run CTform Core on a converging case. The import of `case_step_*.vtk` has not run on real output yet.
 
 ## Blocked
-- Running cases with Core `master`: the v2 reader and the `-ffast-math` tool
-  motion fix exist only on Core `agent/*` branches.
+- Five-punch cases abort at the first contact (Coulomb 0.2 and Levanov 0.2 fail with
+  `line_search_failed_all_lambdas`) on Core `08e9ac4`. Core task C-M1 (friction treatment in the
+  flow formulation). Probe packages: `C:\ctf-probes\five-punch`.
+- Per-pair penalty (`normal.penalty`) is exported but Core v2 ignores it until Core accepts the key.
 
-## Release prep (branch agent/release-prep)
-- Version fields set to 1.0.0 and CHANGELOG.md written. The author creates the tag; merge only on the author's yes.
+## Core reference (checked 2026-10-30)
+- Core `master` contains `agent/v2-thermal-bcs` (a462978 and later), so the earlier wait on that
+  branch is over. Core `master` HEAD is `6fa07e9`, a work-in-progress force-servo commit on top.
+  The probe runs used `08e9ac4`.
 
-## Developer docs (branch agent/dev-docs)
-- `docs/DEVELOPER-GUIDE.md`: module and object graphs, export and run flows, recipes, and
-  a code review of `main` at `d965fc0` with open findings (Run Core error handling, double-run
-  guard, stale DEVELOPMENT-CONTEXT and In progress notes).
-- Branch `agent/run-core-errors`: Run CTform Core reports any worker failure, refuses a second
-  run while one is active, loads results into the document that started the run, and reports
-  an import failure instead of raising. Not yet merged; the command has not been exercised in FreeCAD.
+## Recent (2026-10-30)
+- `docs/DEVELOPER-GUIDE.md`: module and object graphs, export and run flows, recipes and review findings.
+- Run CTform Core: reports every worker failure, refuses a second run while one is active, loads
+  results into the document that started the run, and reports an import failure instead of raising.
+- New Solver property `CoreTimeoutMinutes` (0 = no limit) stops a hung Core.
+- `properties.py` holds the single `add_property` and `length_to_si` helpers (were duplicated in five modules).
+- Removed the unused `CTform_CreateAnalysis` command alias.
+- Release prep: version 1.0.0 in `package.xml` and `pyproject.toml`, CHANGELOG entry. Tag 1.0.0 is the author's.

@@ -3,6 +3,8 @@
 
 """Dimension-neutral CTform case and solver document objects."""
 
+from .properties import add_property
+
 
 class CTformCase:
     """Proxy for the CTform case settings object."""
@@ -117,7 +119,7 @@ class CTformSolver:
             ("AnalysisType", "Model", "CTform"),
         )
         for name, group, default in string_properties:
-            _add(obj, name, "App::PropertyString", group, default)
+            add_property(obj, name, "App::PropertyString", group, default)
 
         float_properties = (
             ("ThermalPlasticEfficiency", "Thermal", 0.9),
@@ -132,13 +134,14 @@ class CTformSolver:
             ("GapTolerance", "Contact", 1e-6),
             ("ZBottom", "Contact", 0.0),
             ("PlaneTolerance", "Model", 1e-7),
+            ("CoreTimeoutMinutes", "External Tools", 0.0),  # 0 = no limit
         )
         for name, group, default in float_properties:
-            _add(obj, name, "App::PropertyFloat", group, default)
+            add_property(obj, name, "App::PropertyFloat", group, default)
 
         integer_properties = (("VtkEvery", "Output", 1),)
         for name, group, default in integer_properties:
-            _add(obj, name, "App::PropertyInteger", group, default)
+            add_property(obj, name, "App::PropertyInteger", group, default)
 
         bool_properties = (
             ("NodalCsvEnabled", "Output", False),
@@ -150,7 +153,7 @@ class CTformSolver:
             ("RemeshEnabled", "Advanced", False),
         )
         for name, group, default in bool_properties:
-            _add(obj, name, "App::PropertyBool", group, default)
+            add_property(obj, name, "App::PropertyBool", group, default)
 
         if "Status" not in obj.PropertiesList:
             obj.addProperty("App::PropertyEnumeration", "Status", "CTform")
@@ -217,12 +220,6 @@ def make_solver(doc, case=None, name="CTformSolver"):
     analysis.addObject(solver)
 
     return solver
-
-
-def _add(obj, name, property_type, group, default):
-    if name not in obj.PropertiesList:
-        obj.addProperty(property_type, name, group)
-        setattr(obj, name, default)
 
 
 def analysis_for_case(case):

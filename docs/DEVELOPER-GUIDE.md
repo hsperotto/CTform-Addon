@@ -91,6 +91,7 @@ flowchart TD
 | `core_runner.py` | Builds the Core command line, runs it, parses `converged=` and warnings, lists outputs. No FreeCAD imports. |
 | `viewproviders.py` | Tree icons. Imports its targets lazily to avoid a cycle. |
 | `identifiers.py` | `readable_id`: slugs with numeric suffixes, stable across label changes. |
+| `properties.py` | `add_property` (one definition per property, default set on creation) and `length_to_si`. No FreeCAD imports. |
 | `json_export.py` | `dumps_si`, used only by `case_export.py`. |
 | `validation.py` | Initial XY-plane geometry checks. Only the tests import it; reserved for the preflight in `STATUS.md` (Next, item 4). |
 | `misc/resources.py` | Icon lookup helper. |
@@ -317,15 +318,15 @@ no five-punch run has converged yet.
 | 1 | `commands.py:430,476` | Medium | The worker catches only `OSError` and `ValueError`. Any other exception ends the thread with no `result` key, and `_report` then raises `KeyError: 'result'`. Catch `Exception` in `work()`, or store the error in both branches. Fixed on `agent/run-core-errors`. |
 | 2 | `commands.py:449-470` | Medium | `_import_results` is called from the QTimer callback with no `try`. A failure in `pipeline.read` shows as a Python traceback and the message box never appears. Fixed on `agent/run-core-errors`. |
 | 3 | `commands.py:377-447` | Medium | There is no guard against starting a second run while one is active. Two Core processes would write the same output folder. Disable the command or check `self._timer` first. Fixed on `agent/run-core-errors`. |
-| 4 | `core_runner.py:113` | Low | `run_core` is called without a timeout, so a hung Core cannot be stopped from the GUI. The docstring and `CoreRunResult.timed_out` describe a timeout path that the command never uses. |
-| 5 | `commands.py:765` | Low | `CTform_CreateAnalysis` aliases `CreateCaseCommand`, is not in any menu and is not used. Remove it unless something external calls it. |
-| 6 | `contacts.py:134`, `case_export.py:1155` | Low | `_length_to_si` is duplicated (the two copies are identical; plain numbers are read as mm). The `_add` helper is duplicated in five modules (`analysis`, `components`, `contacts`, `loadsteps`, `materials`). Move both to one helper module. |
-| 7 | `validation.py` | Info | Only the tests import it. Either wire it into the preflight or delete it. |
+| 4 | `core_runner.py:113` | Low | `run_core` is called without a timeout, so a hung Core cannot be stopped from the GUI. The docstring and `CoreRunResult.timed_out` describe a timeout path that the command never uses. Fixed: Solver property `CoreTimeoutMinutes` (0 = no limit) is passed as the timeout. |
+| 5 | `commands.py:765` | Low | `CTform_CreateAnalysis` aliases `CreateCaseCommand`, is not in any menu and is not used. Remove it unless something external calls it. Fixed: the alias is removed. |
+| 6 | `contacts.py:134`, `case_export.py:1155` | Low | `_length_to_si` is duplicated (the two copies are identical; plain numbers are read as mm). The `_add` helper is duplicated in five modules (`analysis`, `components`, `contacts`, `loadsteps`, `materials`). Move both to one helper module. Fixed: one helper module, `properties.py`. |
+| 7 | `validation.py` | Info | Only the tests import it. Either wire it into the preflight or delete it. Kept on purpose: reserved for the geometry preflight (STATUS, Next item 4). |
 | 8 | `DEVELOPMENT-CONTEXT.md` | Doc | "Current validation" still says 48 tests (the count is 81). The 2026-10-18 handoff says initial temperatures were removed and thermal BCs are out of scope; both are superseded (see `STATUS.md`). Fixed on `agent/run-core-errors` (count and superseded notes). |
-| 9 | `STATUS.md` (In progress) | Doc | Says `agent/core-thermal-force-sync` must wait for Core `agent/v2-thermal-bcs`. That branch is merged into `main` and Core `master` has the v2 reader at `08e9ac4`. Confirm with the author before rewriting this. |
+| 9 | `STATUS.md` (In progress) | Doc | Says `agent/core-thermal-force-sync` must wait for Core `agent/v2-thermal-bcs`. That branch is merged into `main` and Core `master` has the v2 reader at `08e9ac4`. Confirm with the author before rewriting this. Fixed: STATUS rewritten after checking Core `master`. |
 | 10 | `core_runner.py:86` | Verified | VTK naming and CSV columns match Core source (`CTF3/Run/OutputSetup.cpp`) and the probe3 CSV header. The import path itself has not run on real output. |
 
-Items 1, 2, 3 and 8 are fixed on `agent/run-core-errors` (not yet merged). Still open: 4, 5, 6, 7, and 9 (needs the author's confirmation).
+All items are addressed on `agent/run-core-errors` and its follow-up commit. Item 10 and the Core C-M1 friction problem remain open on the Core side.
 
 ## 10. Where to start
 

@@ -11,6 +11,7 @@ from typing import Any
 
 from .identifiers import readable_id
 from .viewproviders import attach_view_provider
+from .properties import add_property
 
 
 MATERIAL_MODELS = (
@@ -38,38 +39,38 @@ class CTformMaterial:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "MaterialId", "App::PropertyString", "Identity", "")
-        _add(obj, "MaterialName", "App::PropertyString", "Identity", "New CTform Material")
-        _add(obj, "Model", "App::PropertyEnumeration", "Constitutive", list(MATERIAL_MODELS))
-        _add(obj, "HenselSpittelA", "App::PropertyPressure", "Hensel-Spittel", 0.0)
+        add_property(obj, "MaterialId", "App::PropertyString", "Identity", "")
+        add_property(obj, "MaterialName", "App::PropertyString", "Identity", "New CTform Material")
+        add_property(obj, "Model", "App::PropertyEnumeration", "Constitutive", list(MATERIAL_MODELS))
+        add_property(obj, "HenselSpittelA", "App::PropertyPressure", "Hensel-Spittel", 0.0)
         for name in ("HenselSpittelM1", "HenselSpittelM2", "HenselSpittelM3", "HenselSpittelM4"):
-            _add(obj, name, "App::PropertyFloat", "Hensel-Spittel", 0.0)
-        _add(obj, "HollomonK", "App::PropertyPressure", "Hollomon", 0.0)
+            add_property(obj, name, "App::PropertyFloat", "Hensel-Spittel", 0.0)
+        add_property(obj, "HollomonK", "App::PropertyPressure", "Hollomon", 0.0)
         for name in ("HollomonN", "HollomonEps0", "HollomonRateExponent"):
-            _add(obj, name, "App::PropertyFloat", "Hollomon", 0.0)
-        _add(obj, "NortonHoffK", "App::PropertyPressure", "Norton-Hoff", 0.0)
-        _add(obj, "NortonHoffM", "App::PropertyFloat", "Norton-Hoff", 0.0)
-        _add(obj, "YieldStress", "App::PropertyPressure", "Elastoplastic", 0.0)
-        _add(obj, "HardeningModulus", "App::PropertyPressure", "Elastoplastic", 0.0)
-        _add(obj, "YoungModulus", "App::PropertyPressure", "Elastic", 0.0)
-        _add(obj, "PoissonRatio", "App::PropertyFloat", "Elastic", 0.3)
-        _add(obj, "Density", "App::PropertyDensity", "Thermal", 0.0)
-        _add(
+            add_property(obj, name, "App::PropertyFloat", "Hollomon", 0.0)
+        add_property(obj, "NortonHoffK", "App::PropertyPressure", "Norton-Hoff", 0.0)
+        add_property(obj, "NortonHoffM", "App::PropertyFloat", "Norton-Hoff", 0.0)
+        add_property(obj, "YieldStress", "App::PropertyPressure", "Elastoplastic", 0.0)
+        add_property(obj, "HardeningModulus", "App::PropertyPressure", "Elastoplastic", 0.0)
+        add_property(obj, "YoungModulus", "App::PropertyPressure", "Elastic", 0.0)
+        add_property(obj, "PoissonRatio", "App::PropertyFloat", "Elastic", 0.3)
+        add_property(obj, "Density", "App::PropertyDensity", "Thermal", 0.0)
+        add_property(
             obj,
             "ThermalExpansionCoefficient",
             "App::PropertyThermalExpansionCoefficient",
             "Thermal",
             0.0,
         )
-        _add(obj, "ThermalConductivity", "App::PropertyThermalConductivity", "Thermal", 0.0)
-        _add(obj, "SpecificHeat", "App::PropertySpecificHeat", "Thermal", 0.0)
+        add_property(obj, "ThermalConductivity", "App::PropertyThermalConductivity", "Thermal", 0.0)
+        add_property(obj, "SpecificHeat", "App::PropertySpecificHeat", "Thermal", 0.0)
         for name in (
             "YoungModulusTableJSON",
             "ConductivityTableJSON",
             "SpecificHeatTableJSON",
             "FlowStressTableJSON",
         ):
-            _add(obj, name, "App::PropertyString", "Temperature Tables", "[]")
+            add_property(obj, name, "App::PropertyString", "Temperature Tables", "[]")
 
     def onDocumentRestored(self, obj=None):
         if obj is not None:
@@ -415,12 +416,3 @@ def _json_array(obj: object, property_name: str) -> list[Any]:
         raise ValueError(f"{property_name} must contain a JSON array")
     return value
 
-
-def _add(obj, name, property_type, group, default):
-    if name not in obj.PropertiesList:
-        obj.addProperty(property_type, name, group)
-        if property_type == "App::PropertyEnumeration":
-            setattr(obj, name, default)
-            setattr(obj, name, default[0])
-        else:
-            setattr(obj, name, default)

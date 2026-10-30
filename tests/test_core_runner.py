@@ -98,6 +98,28 @@ class CoreRunnerTests(unittest.TestCase):
             self.assertEqual([p.name for p in result.steps], ["case_step_1.vtk"])
             self.assertTrue(result.log_file.is_file())
 
+    def test_timeout_stops_a_hung_core_and_keeps_the_run_as_timed_out(self):
+        # The launcher's child can outlive the kill on Windows and keep the log open,
+        # so cleanup ignores that error instead of failing the test.
+        with TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            root = Path(folder)
+            stub = root / "hung_core.py"
+            stub.write_text("import time\ntime.sleep(60)\n")
+            case = root / "case.json"
+            case.write_text("{}")
+            launcher = root / ("hung_core.bat" if os.name == "nt" else "hung_core.sh")
+            launcher.write_text(
+                f'@"{sys.executable}" "{stub}" %*\n' if os.name == "nt"
+                else f'#!/bin/sh\n"{sys.executable}" "{stub}" "$@"\n'
+            )
+            launcher.chmod(0o755)
+
+            result = run_core(launcher, case, root / "out", timeout=1)
+
+            self.assertTrue(result.timed_out)
+            self.assertIsNone(result.return_code)
+            self.assertFalse(result.finished)
+
     def test_missing_executable_or_package_is_reported(self):
         with TemporaryDirectory() as folder:
             case = Path(folder) / "case.json"

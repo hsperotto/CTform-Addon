@@ -4,6 +4,7 @@
 """CTform load-step and process-condition document objects."""
 
 from .viewproviders import attach_view_provider
+from .properties import add_property
 
 
 class CTformLoadStep:
@@ -21,15 +22,15 @@ class CTformLoadStep:
 
     def _add_properties(self):
         obj = self.Object
-        _add(obj, "StepId", "App::PropertyInteger", "Load Step", 1)
-        _add(obj, "StepName", "App::PropertyString", "Load Step", "LoadStep")
-        _add(obj, "StartTime", "App::PropertyFloat", "Load Step", 0.0)
-        _add(obj, "EndTime", "App::PropertyFloat", "Load Step", 1.0)
-        _add(obj, "Increments", "App::PropertyInteger", "Load Step", 1)
-        _add(obj, "Active", "App::PropertyBool", "Load Step", True)
-        _add(obj, "MechanicalBCs", "App::PropertyLinkList", "Conditions", [])
-        _add(obj, "ThermalBCs", "App::PropertyLinkList", "Conditions", [])
-        _add(obj, "ToolMotions", "App::PropertyLinkList", "Conditions", [])
+        add_property(obj, "StepId", "App::PropertyInteger", "Load Step", 1)
+        add_property(obj, "StepName", "App::PropertyString", "Load Step", "LoadStep")
+        add_property(obj, "StartTime", "App::PropertyFloat", "Load Step", 0.0)
+        add_property(obj, "EndTime", "App::PropertyFloat", "Load Step", 1.0)
+        add_property(obj, "Increments", "App::PropertyInteger", "Load Step", 1)
+        add_property(obj, "Active", "App::PropertyBool", "Load Step", True)
+        add_property(obj, "MechanicalBCs", "App::PropertyLinkList", "Conditions", [])
+        add_property(obj, "ThermalBCs", "App::PropertyLinkList", "Conditions", [])
+        add_property(obj, "ToolMotions", "App::PropertyLinkList", "Conditions", [])
 
     def onDocumentRestored(self, obj=None):
         if obj is not None:
@@ -59,14 +60,14 @@ class CTformMechanicalBC:
 
     def __init__(self, obj):
         self.Object = obj
-        _add(obj, "BCId", "App::PropertyInteger", "Boundary Condition", 1)
-        _add(obj, "Name", "App::PropertyString", "Boundary Condition", "BoundaryCondition")
-        _add(obj, "Type", "App::PropertyString", "Boundary Condition", "Fixed")
-        _add(obj, "Axis", "App::PropertyEnumeration", "Boundary Condition", ["X", "Y", "Z"])
+        add_property(obj, "BCId", "App::PropertyInteger", "Boundary Condition", 1)
+        add_property(obj, "Name", "App::PropertyString", "Boundary Condition", "BoundaryCondition")
+        add_property(obj, "Type", "App::PropertyString", "Boundary Condition", "Fixed")
+        add_property(obj, "Axis", "App::PropertyEnumeration", "Boundary Condition", ["X", "Y", "Z"])
         obj.Axis = "Z"
-        _add(obj, "Target", "App::PropertyString", "Boundary Condition", "")
-        _add(obj, "Value", "App::PropertyFloat", "Boundary Condition", 0.0)
-        _add(obj, "Active", "App::PropertyBool", "Boundary Condition", True)
+        add_property(obj, "Target", "App::PropertyString", "Boundary Condition", "")
+        add_property(obj, "Value", "App::PropertyFloat", "Boundary Condition", 0.0)
+        add_property(obj, "Active", "App::PropertyBool", "Boundary Condition", True)
 
     def dumps(self):
         return None
@@ -80,14 +81,14 @@ class CTformToolMotion:
 
     def __init__(self, obj):
         self.Object = obj
-        _add(obj, "MotionId", "App::PropertyInteger", "Tool Motion", 1000)
-        _add(obj, "ToolId", "App::PropertyString", "Tool Motion", "")
-        _add(obj, "ToolName", "App::PropertyString", "Tool Motion", "")
-        _add(obj, "Vx", "App::PropertyFloat", "Tool Motion", 0.0)
-        _add(obj, "Vy", "App::PropertyFloat", "Tool Motion", 0.0)
-        _add(obj, "Vz", "App::PropertyFloat", "Tool Motion", 0.0)
-        _add(obj, "Active", "App::PropertyBool", "Tool Motion", True)
-        _add(obj, "HeatTransferCoefficient", "App::PropertyFloat", "Thermal", 0.0)
+        add_property(obj, "MotionId", "App::PropertyInteger", "Tool Motion", 1000)
+        add_property(obj, "ToolId", "App::PropertyString", "Tool Motion", "")
+        add_property(obj, "ToolName", "App::PropertyString", "Tool Motion", "")
+        add_property(obj, "Vx", "App::PropertyFloat", "Tool Motion", 0.0)
+        add_property(obj, "Vy", "App::PropertyFloat", "Tool Motion", 0.0)
+        add_property(obj, "Vz", "App::PropertyFloat", "Tool Motion", 0.0)
+        add_property(obj, "Active", "App::PropertyBool", "Tool Motion", True)
+        add_property(obj, "HeatTransferCoefficient", "App::PropertyFloat", "Thermal", 0.0)
 
     def dumps(self):
         return None
@@ -246,16 +247,6 @@ def condition_targets_tool(condition, case):
         any(getattr(tool, "Shape", None) is obj for obj in referenced_objects)
         for tool in (getattr(case, "Tools", ()) or ())
     )
-
-
-def _add(obj, name, property_type, group, default):
-    if name not in obj.PropertiesList:
-        obj.addProperty(property_type, name, group)
-        if property_type == "App::PropertyEnumeration":
-            setattr(obj, name, default)
-            setattr(obj, name, default[0])
-        else:
-            setattr(obj, name, default)
 
 
 def _link_to_case(analysis, property_name, obj):
