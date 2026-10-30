@@ -9,7 +9,9 @@ Read `STATUS.md` first, then `DEVELOPMENT-CONTEXT.md` (design rules) and
 
 - FreeCAD probe (needs FreeCADCmd and FreeCAD's gmsh; not run by unittest):
   `set CTFORM_PROBE_OUT=<folder>` then
-  `FreeCADCmd.exe tests/freecad/probe_five_punch_export.py`. It builds a
+  `FreeCADCmd.exe tests/freecad/probe_five_punch_export.py`. Optional switches: `CTFORM_PROBE_PUNCH_GAP` (mm), `CTFORM_PROBE_MU`
+  (0 exports friction `none`), `CTFORM_PROBE_NO_HOLDER`, `CTFORM_PROBE_NO_AXIS`,
+  `CTFORM_PROBE_INCREMENTS`. It builds a
   five-punch-style case (placeholder nose height) and prints what the export
   contains.
 

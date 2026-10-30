@@ -42,8 +42,9 @@ BORE_RADIUS = 27.0
 DIE_ENTRY_RADIUS = 6.0
 PUNCH_RADIUS = 25.0
 PUNCH_CORNER = 6.0
-PUNCH_GAP = 1.0  # placeholder initial punch-sheet gap
+PUNCH_GAP = float(os.environ.get("CTFORM_PROBE_PUNCH_GAP", "1.0"))  # placeholder, mm
 HOLDER_GAP = 0.05
+FRICTION = float(os.environ.get("CTFORM_PROBE_MU", "0.2"))
 STROKE = 30.0
 PRESSURE_MPA = 5.0
 PRESS_SPEED = 19.5  # mm/s, Rocha (2022); not stated by Nunes
@@ -144,8 +145,8 @@ def build():
 
     for tool in tools.values():
         pair = contacts.make_contact_pair(doc, workpiece, tool)
-        pair.FrictionModel = "coulomb"
-        pair.FrictionCoefficient = 0.2
+        pair.FrictionModel = "coulomb" if FRICTION > 0 else "none"
+        pair.FrictionCoefficient = FRICTION
 
     total = PUNCH_GAP + STROKE
     duration = total / PRESS_SPEED
