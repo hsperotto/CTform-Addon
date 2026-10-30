@@ -2,7 +2,7 @@
 # SPDX-FileNotice: Part of the CTform FreeCAD Interface addon.
 
 [project]
-version = "0.1.0"
+version = "1.0.0"
 name = "ctform-freecad-interface"
 requires-python = ">=3.11"
 dependencies = []
