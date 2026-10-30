@@ -73,11 +73,12 @@ Plotted, not a VTK field, and first in the panel:
    metrics come from `tools/compare_force.py` in the thesis repo; the viewer plot is a
    convenience view of Core's per-tool force output.
 
-   **Stroke** is measured from the punch's first contact with the sheet, not from
-   t = 0. The start of contact is not in the CSV directly; the plan derives it in
-   phase 1 (first step with punch force > 0, or `ContactActive` in the VTK), and checks
-   it against the prescribed motion (`loadsteps.json`, punch velocity 19.5 mm/s in the
-   probes). The placeholder initial gap (1 mm) must be subtracted, so the check matters.
+   **Stroke** is measured from the punch's first contact with the sheet, not from t = 0.
+   Proposed rule (Thay, 2026-10-30; not yet approved by the author): stroke = punch
+   displacement minus the initial punch-sheet gap, which the case knows exactly. Cross-check:
+   the first step where punch force exceeds 1 % of the final punch force (not "> 0", since
+   a penalty contact can show a tiny force before real contact). Until the author approves
+   the rule, the plot is labelled "stroke (unconfirmed)".
 
 VTK fields, in order:
 
