@@ -487,3 +487,10 @@ body stay allowed.
 - A Tool force with a radial component is a readiness issue in both modelling types
 (axisymmetric: a full ring carries no net radial force; plane strain: Core moves tools
 only along Z for now).
+
+### 2026-10-30: Optional contact penalty (prepared)
+
+- Contact pairs have a `Penalty` property (default 0 = Core default). When above 0 it is
+  exported as `contactInterfaces[].normal.penalty`. Core's v2 normalizer drops that key
+  today, so it has no effect until Core accepts it; it is an optional field and does not
+  change `SCHEMA_VERSION`.
