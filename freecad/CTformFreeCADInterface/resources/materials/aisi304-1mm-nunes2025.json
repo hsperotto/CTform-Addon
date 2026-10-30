@@ -1,0 +1,115 @@
+{
+  "catalogNote": "AISI 304, 1.0 mm cold-rolled sheet of the five-punch test (Nunes 2025). K and n are the Hollomon fits for 0/45/90 deg in Table 'material' of the thesis; 'mean' is their arithmetic mean. E = 200 GPa, nu = 0.3 and density = 8000 kg/m^3 are the values of Rocha (2022), not given by Nunes. thermalExpansionCoefficient, thermalConductivity and specificHeat are generic austenitic-steel PLACEHOLDERS (unused in an isothermal run); confirm or replace before citing them. eps0 = 0 gives sigma = K eps^n; Core floors the strain at 1e-4 for numerical regularization. mRate = 0 means rate independent. The tool steel record is a placeholder for rigid tools.",
+  "materials": [
+    {
+      "id": "aisi304-1mm-rd0",
+      "name": "AISI 304 1 mm, 0 deg (Nunes 2025)",
+      "constitutive": {
+        "model": "Hollomon",
+        "parameters": {
+          "K": 1318300000.0,
+          "n": 0.35,
+          "eps0": 0.0,
+          "mRate": 0.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
+      "id": "aisi304-1mm-rd45",
+      "name": "AISI 304 1 mm, 45 deg (Nunes 2025)",
+      "constitutive": {
+        "model": "Hollomon",
+        "parameters": {
+          "K": 1198400000.0,
+          "n": 0.33,
+          "eps0": 0.0,
+          "mRate": 0.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
+      "id": "aisi304-1mm-rd90",
+      "name": "AISI 304 1 mm, 90 deg (Nunes 2025)",
+      "constitutive": {
+        "model": "Hollomon",
+        "parameters": {
+          "K": 1232300000.0,
+          "n": 0.34,
+          "eps0": 0.0,
+          "mRate": 0.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
+      "id": "aisi304-1mm-mean",
+      "name": "AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)",
+      "constitutive": {
+        "model": "Hollomon",
+        "parameters": {
+          "K": 1249666666.667,
+          "n": 0.34,
+          "eps0": 0.0,
+          "mRate": 0.0
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
+      "id": "rigid-tool-steel",
+      "name": "Rigid Tool Steel (placeholder)",
+      "constitutive": {
+        "model": "ElasticIsotropic",
+        "parameters": {}
+      },
+      "elastic": {
+        "youngModulus": 210000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 7800.0,
+        "thermalExpansionCoefficient": 1.2e-05,
+        "thermalConductivity": 24.0,
+        "specificHeat": 460.0
+      }
+    }
+  ]
+}

@@ -8,12 +8,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from .components import CTformTool, CTformWorkpiece
+from .dxf_writer import arc_primitive, polyline_primitives, write_dxf
 
 
 def export_component_geometry(component: object, output_path: str | Path) -> dict[str, object]:
     """Export a component's planar profile as ASCII DXF in SI meters."""
     import FreeCAD as App
-    import Part
 
     target = getattr(component, "Shape", None)
     shape = getattr(target, "Shape", None)
@@ -30,69 +30,55 @@ def export_component_geometry(component: object, output_path: str | Path) -> dic
     if not is_workpiece and not is_tool:
         raise ValueError(f"Unsupported CTform geometry component: {component.Label!r}")
     tool_layer = _validate_layer_name(getattr(component, "ToolLayer", "") or "ToolProfile")
-    temporary_document = None
-    created = []
-    try:
-        temporary_document = App.newDocument("CTformDxfExport")
-        placement = target.getGlobalPlacement()
-        scale = App.Matrix()
-        scale.scale(1e-3, 1e-3, 1e-3)
-        scaled_edges = []
-        for index, edge in enumerate(edges, start=1):
-            world_edge = edge.copy().transformShape(placement.Matrix, True, True)
-            bounds = world_edge.BoundBox
-            if max(abs(bounds.ZMin), abs(bounds.ZMax), bounds.ZLength) > 1e-7:
-                raise ValueError(
-                    f"Geometry edge Edge{index} is outside the XY plane after placement and cannot be exported as 2D DXF"
-                )
-            si_edge = world_edge.transformShape(scale, True, True)
-            if is_workpiece:
-                export_obj = temporary_document.addObject("Part::Feature", f"Edge{index}")
-                export_obj.Shape = si_edge
-                created.append(export_obj)
-            else:
-                scaled_edges.append(si_edge)
+    placement = target.getGlobalPlacement()
+    layers: dict[str, list[dict]] = {}
+    for index, edge in enumerate(edges, start=1):
+        world_edge = edge.copy().transformShape(placement.Matrix, True, True)
+        bounds = world_edge.BoundBox
+        if max(abs(bounds.ZMin), abs(bounds.ZMax), bounds.ZLength) > 1e-7:
+            raise ValueError(
+                f"Geometry edge Edge{index} is outside the XY plane after placement and cannot be exported as 2D DXF"
+            )
+        layer = f"Edge{index}" if is_workpiece else tool_layer
+        layers.setdefault(layer, []).extend(_edge_primitives(world_edge))
+    if not any(layers.values()):
+        raise ValueError("DXF export contains no Core-supported 2D profile entities")
 
-        if is_tool:
-            export_obj = temporary_document.addObject("Part::Feature", tool_layer)
-            export_obj.Shape = Part.makeCompound(scaled_edges)
-            created.append(export_obj)
+    output = write_dxf(output_path, layers)
+    return {
+        "format": "dxf-ascii-r12",
+        "lengthUnit": "m",
+        "layers": sorted(layers),
+        "file": output.as_posix(),
+    }
 
-        output = Path(output_path)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            import importDXF
-        except ImportError:
-            import sys
-            import FreeCAD
 
-            sys.path.append(FreeCAD.getHomePath() + "Mod/Draft")
-            import importDXF
+_MM_TO_M = 1e-3
 
-        importDXF.export(created, str(output), nospline=True, lwPoly=True)
-        payload = output.read_bytes()
-        if b"\x00" in payload:
-            raise ValueError("FreeCAD DXF exporter produced binary output; ASCII DXF is required")
-        text = payload.decode("ascii", errors="strict")
-        dxf_lines = text.splitlines()
-        entity_types = {
-            dxf_lines[index + 1].strip()
-            for index, code in enumerate(dxf_lines[:-1])
-            if code.strip() == "0"
-        }
-        if "ENTITIES" not in text or not entity_types.intersection(
-            {"LINE", "LWPOLYLINE", "ARC", "CIRCLE", "ELLIPSE"}
-        ):
-            raise ValueError("DXF export contains no Core-supported 2D profile entities")
-        return {
-            "format": "dxf-ascii-r12",
-            "lengthUnit": "m",
-            "layers": sorted({obj.Name for obj in created}),
-            "file": output.as_posix(),
-        }
-    finally:
-        if temporary_document is not None:
-            App.closeDocument(temporary_document.Name)
+
+def _edge_primitives(edge) -> list[dict]:
+    """Convert one FreeCAD edge (mm, in the XY plane) to DXF primitives in meters.
+
+    Lines and circular arcs stay exact; any other curve is discretized.
+    """
+    curve_type = type(edge.Curve).__name__
+    first, last = edge.FirstParameter, edge.LastParameter
+
+    def point(parameter):
+        value = edge.valueAt(parameter)
+        return (value.x * _MM_TO_M, value.y * _MM_TO_M)
+
+    if curve_type in ("Line", "LineSegment"):
+        return polyline_primitives([point(first), point(last)])
+    if curve_type == "Circle":
+        center = edge.Curve.Center
+        center_m = (center.x * _MM_TO_M, center.y * _MM_TO_M)
+        radius_m = edge.Curve.Radius * _MM_TO_M
+        if edge.isClosed():
+            return [{"type": "CIRCLE", "center": center_m, "radius": radius_m}]
+        return [arc_primitive(center_m, point(first), point((first + last) / 2.0), point(last))]
+    points = [(p.x * _MM_TO_M, p.y * _MM_TO_M) for p in edge.discretize(Deflection=1e-3)]
+    return polyline_primitives(points)
 
 
 def _validate_layer_name(name: str) -> str:

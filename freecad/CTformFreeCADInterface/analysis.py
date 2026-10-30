@@ -144,6 +144,7 @@ class CTformSolver:
             ("GeometryOnly", "Run", False),
             ("AugmentedLagrangeEnabled", "Contact", True),
             ("ThermalContactEnabled", "Contact", False),
+            ("ExportTargetCompression", "Run", True),
             ("ALEEnabled", "Advanced", False),
             ("RemeshEnabled", "Advanced", False),
         )
@@ -156,6 +157,20 @@ class CTformSolver:
             obj.Status = "New"
         if "Case" not in obj.PropertiesList:
             obj.addProperty("App::PropertyLink", "Case", "CTform")
+
+
+def apply_isothermal_preset(solver, temperature_k=293.15):
+    """Set the Solver parameters that keep a case isothermal at ``temperature_k``.
+
+    No master switch exists: plastic and friction heating are set to zero,
+    thermal contact is off, and the sheet and tools start at the same
+    temperature. Thermal boundary conditions are simply not added.
+    """
+    solver.ThermalPlasticEfficiency = 0.0
+    solver.ThermalFrictionEfficiency = 0.0
+    solver.ThermalContactEnabled = False
+    solver.InitialWorkpieceTemperature = float(temperature_k)
+    solver.InitialToolTemperature = float(temperature_k)
 
 
 def make_case(doc, name="CTformCase"):

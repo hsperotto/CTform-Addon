@@ -98,7 +98,7 @@ def case_to_dict(
         },
         "run": {
             "geometryOnly": _value(solver, "GeometryOnly", False),
-            "targetCompression": _length_to_si(_value(solver, "TargetCompression", 7.0)),
+            **_target_compression(solver),
             **_external_tools(solver),
         },
         "ale": {"enabled": _value(solver, "ALEEnabled", False)},
@@ -293,6 +293,13 @@ def _check_workpiece_force(
             f"Force condition {label!r}: an axisymmetric Tool force cannot have a radial "
             "component (a full ring carries no net radial force); use an axial direction."
         )
+
+
+def _target_compression(solver: object | None) -> dict[str, Any]:
+    """Workpiece compression target; omitted for sheet cases that run to the end of their steps."""
+    if not _value(solver, "ExportTargetCompression", True):
+        return {}
+    return {"targetCompression": _length_to_si(_value(solver, "TargetCompression", 7.0))}
 
 
 def _external_tools(solver: object | None) -> dict[str, Any]:
