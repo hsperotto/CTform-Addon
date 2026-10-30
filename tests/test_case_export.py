@@ -754,7 +754,8 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(motion["direction"], [1.0, 0.0, 0.0])
         self.assertEqual(len(axisymmetric), 1)
         self.assertIn("radial", axisymmetric[0])
-        self.assertEqual(plane_strain, [])
+        self.assertEqual(len(plane_strain), 1)
+        self.assertIn("only along Z", plane_strain[0])
 
     def test_axial_tool_force_has_no_role_requirement(self):
         case, _ = self._tool_force_step((0.0, 1.0, 0.0))
@@ -941,7 +942,7 @@ class CaseExportTests(unittest.TestCase):
             SimpleNamespace(RemeshEnabled=True, MechanicalFormulation="displacement"),
         )
 
-        self.assertEqual(len(issues), 5)
+        self.assertEqual(len(issues), 6)  # includes the whole-body convection
         self.assertTrue(any("Remesh" in issue for issue in issues))
         self.assertTrue(any("Tri3 and Quad4" in issue for issue in issues))
         self.assertTrue(any("CFlux" in issue for issue in issues))
@@ -972,6 +973,69 @@ class CaseExportTests(unittest.TestCase):
             _external_tools(SimpleNamespace(GmshExecutable="", MmgDirectory="C:/mmg")),
             {"externalTools": {"mmgDirectory": "C:/mmg"}},
         )
+    def _bc(self, type_id, label, references, **values):
+        return SimpleNamespace(
+            TypeId=type_id, Proxy=None, Label=label, References=references, Active=True, **values
+        )
+
+    def _targets_case(self, mechanical=(), thermal=()):
+        step = SimpleNamespace(
+            StepId=1, MechanicalBCs=list(mechanical), ThermalBCs=list(thermal), ToolMotions=[]
+        )
+        return SimpleNamespace(LoadSteps=[step], Tools=[])
+
+    GROUPS = [
+        {"name": "Edge4", "id": 1, "dimension": 1},
+        {"name": "Face1", "id": 2, "dimension": 2},
+    ]
+
+    def test_mechanical_bc_without_an_edge_is_a_readiness_issue(self):
+        body = SimpleNamespace()
+        no_reference = self._bc("Fem::ConstraintFixed", "Fix all", [])
+        face = self._bc("Fem::ConstraintDisplacement", "Move body", [(body, ["Face1"])])
+        edge = self._bc(
+            "Fem::ConstraintDisplacement", "Axis", [(body, ["Edge4"])],
+            xFree=False, xDisplacement=0.0,
+        )
+
+        def issues_for(*conditions):
+            return _core_v2_unsupported_issues(
+                self._targets_case(mechanical=conditions),
+                {"physicalGroups": self.GROUPS}, {}, SimpleNamespace(),
+            )
+
+        self.assertEqual(len(issues_for(no_reference)), 1)
+        self.assertEqual(len(issues_for(face)), 1)
+        self.assertIn("every node of the sheet", issues_for(no_reference)[0])
+        self.assertEqual(issues_for(edge), [])
+
+    def test_whole_body_temperature_and_heat_source_are_allowed(self):
+        temperature = self._bc(
+            "Fem::ConstraintTemperature", "Hold 20 C", [], ConstraintType="Temperature"
+        )
+        heat_flux = self._bc(
+            "Fem::ConstraintHeatflux", "Air", [], ConstraintType="Convection"
+        )
+
+        def issues_for(condition):
+            return _core_v2_unsupported_issues(
+                self._targets_case(thermal=[condition]),
+                {"physicalGroups": self.GROUPS}, {}, SimpleNamespace(),
+            )
+
+        self.assertEqual(issues_for(temperature), [])
+        self.assertEqual(len(issues_for(heat_flux)), 1)
+
+    def test_bc_on_a_tool_is_not_a_whole_body_issue(self):
+        tool_shape = SimpleNamespace()
+        fixed_tool = self._bc("Fem::ConstraintFixed", "Fix die", [(tool_shape, ["Edge1"])])
+        case = self._targets_case(mechanical=[fixed_tool])
+        case.Tools = [SimpleNamespace(Shape=tool_shape, ToolId="die", ToolName="Die", Label="Die")]
+
+        self.assertEqual(
+            _core_v2_unsupported_issues(case, {"physicalGroups": self.GROUPS}, {}, SimpleNamespace()), []
+        )
+
     def _thermal_step(self, condition):
         return SimpleNamespace(
             StepId=1, StepName="Heat", StartTime=0.0, EndTime=1.0, Increments=1,

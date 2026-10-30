@@ -475,3 +475,15 @@ about 1.98 MN against 20.4 kN. Both are open on the Core side. Packages and logs
 `C:\ctf-probes\five-punch\`.
 - FreeCAD's DXF exporter wrote small arcs (chord under about 10 mm in metres) as full
 CIRCLE entities; `dxf_writer.py` replaces it.
+
+### 2026-10-30: Readiness for untargeted BCs and radial tool forces
+
+- Core silently applies a v2 BC with no `physicalGroupId` and no specific `target` to
+every node. The addon always writes one of the two, but `target: "All"` (no reference,
+or a Face reference) or a face-dimension physical group means the whole sheet, so
+readiness now reports such Fixed, Displacement, Symmetry, Velocity, HeatFlux, Convection
+and Radiation conditions on the Workpiece. Temperature and HeatGeneration on the whole
+body stay allowed.
+- A Tool force with a radial component is a readiness issue in both modelling types
+(axisymmetric: a full ring carries no net radial force; plane strain: Core moves tools
+only along Z for now).

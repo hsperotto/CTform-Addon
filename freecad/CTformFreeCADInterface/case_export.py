@@ -229,17 +229,59 @@ def _core_v2_unsupported_issues(
         (mesh_info or {}).get("elementTypes") or ()
     ):
         issues.append("Core v2 does not support meshes that mix Tri3 and Quad4 elements.")
+    groups = (mesh_info or {}).get("physicalGroups")
     steps = list(getattr(case, "LoadSteps", ()) or ())
     for step in steps:
         for condition in _step_conditions(step, "thermal", "ThermalBCs"):
             _check_workpiece_thermal(condition, case, issues)
+            _check_whole_body_target(condition, case, groups, True, issues)
         for condition in _step_conditions(step, "mechanical", "MechanicalBCs"):
             _check_workpiece_force(condition, case, solver, issues)
+            _check_whole_body_target(condition, case, groups, False, issues)
     for condition in _root_conditions(case, "thermal"):
         _check_workpiece_thermal(condition, case, issues)
+        _check_whole_body_target(condition, case, groups, True, issues)
     for condition in _root_conditions(case, "mechanical"):
         _check_workpiece_force(condition, case, solver, issues)
+        _check_whole_body_target(condition, case, groups, False, issues)
     return list(dict.fromkeys(issues))
+
+
+def _check_whole_body_target(
+    condition: object, case: object, groups, thermal: bool, issues: list[str]
+) -> None:
+    """Core applies a BC without a specific target to every node of the sheet.
+
+    Mechanical BCs (fixed, displacement, symmetry, velocity) and surface thermal
+    BCs (heat flux, convection, radiation) must name an edge; a whole-body
+    Temperature or HeatGeneration is legitimate and is not reported.
+    """
+    if _condition_tool_data(condition, case) is not None:
+        return
+    type_name = _condition_type_name(condition)
+    kind = str(getattr(condition, "Type", ""))
+    if thermal:
+        if "temperature" in type_name or "bodyheatsource" in type_name or kind in (
+            "Temperature", "HeatGeneration"
+        ):
+            return
+    elif "force" in type_name or kind == "Force":
+        return  # reported by _check_workpiece_force
+    try:
+        targets = _condition_target_data(condition, groups)
+    except ValueError:
+        return  # unknown group: the export itself fails with a clear message
+    by_name = {item["name"]: item for item in groups or ()}
+    for target in targets:
+        whole = target.get("target") == "All" and not target.get("useZSelector")
+        group = by_name.get(target.get("physicalGroup", ""))
+        if whole or (group is not None and group.get("dimension") == 2):
+            issues.append(
+                f"Condition {getattr(condition, 'Label', '')!r} is not tied to an edge of the "
+                "Workpiece, so Core would apply it to every node of the sheet; select the edge "
+                "it acts on."
+            )
+            return
 
 
 def _workpiece_density(case: object) -> float | None:
@@ -282,16 +324,21 @@ def _check_workpiece_force(
             "remove it from the Workpiece."
         )
         return
-    if str(_value(solver, "ModelingType", "axisymmetric")) != "axisymmetric":
-        return
     try:
         direction, _ = _tool_force_direction(condition)
     except ValueError:
         return
-    if abs(direction[0]) > 1e-9:
+    if abs(direction[0]) <= 1e-9:
+        return
+    if str(_value(solver, "ModelingType", "axisymmetric")) == "axisymmetric":
         issues.append(
             f"Force condition {label!r}: an axisymmetric Tool force cannot have a radial "
             "component (a full ring carries no net radial force); use an axial direction."
+        )
+    else:
+        issues.append(
+            f"Force condition {label!r}: Core currently moves tools only along Z, so a Tool "
+            "force with a radial component is not supported; use an axial direction."
         )
 
 

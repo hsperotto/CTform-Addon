@@ -40,11 +40,16 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - Axisymmetric flow cases need a radial displacement BC of 0 on the r = 0 edge of the
   sheet (Core's flow solver does not constrain the axis); the probe adds it as a
   Displacement constraint on that edge (`Displacement`, `axis X`, `value 0`).
+- Readiness also reports a Workpiece mechanical BC (fixed, displacement, symmetry, velocity)
+  or surface thermal BC (heat flux, convection, radiation) that is not tied to an
+  edge, because Core applies such a BC to every node; whole-body Temperature and
+  HeatGeneration are allowed. A Tool force with any radial component is a readiness
+  issue (Core moves tools only along Z for now).
 - Run CTform Core command (Solver `CoreExecutable`): runs `ctform3_cli`, logs,
   and reports convergence, package warnings and step files (`core_runner.py`).
 - Contact interfaces name their master tool explicitly (`masterBody`,
   `masterToolId`, `master.name/toolId`) and the workpiece slave group.
-- 78 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- 81 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
