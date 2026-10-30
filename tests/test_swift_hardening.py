@@ -159,15 +159,15 @@ class CoreV2GuardTests(unittest.TestCase):
         self.assertFalse(any("pure Quad4" in issue for issue in self._issues(["Quad4"], "displacement")))
         self.assertFalse(any("pure Quad4" in issue for issue in self._issues(["Tri3"], "flow")))
 
-    def test_swift_export_waits_for_core_support(self):
+    def test_swift_export_is_ready_with_core_support(self):
         catalog = {"materials": [{
             "id": "ep", "name": "EP",
             "constitutive": {"model": "ElastoPlasticIsotropic", "parameters": {"K": 1e9, "n": 0.3, "eps0": 0.005}},
         }]}
 
-        self.assertTrue(any("Swift hardening" in issue for issue in self._issues(["Quad4"], "displacement", catalog)))
-        with mock.patch.object(case_export, "CORE_SWIFT_SUPPORTED", True):
-            self.assertFalse(any("Swift hardening" in issue for issue in self._issues(["Quad4"], "displacement", catalog)))
+        self.assertFalse(any("Swift hardening" in issue for issue in self._issues(["Quad4"], "displacement", catalog)))
+        with mock.patch.object(case_export, "CORE_SWIFT_SUPPORTED", False):
+            self.assertTrue(any("Swift hardening" in issue for issue in self._issues(["Quad4"], "displacement", catalog)))
 
 
 if __name__ == "__main__":

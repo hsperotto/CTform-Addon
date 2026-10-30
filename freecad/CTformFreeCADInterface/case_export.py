@@ -19,9 +19,9 @@ from .properties import length_to_si
 
 
 SCHEMA_VERSION = 2
-# Set to True when Core's v2 ElastoPlasticIsotropic reads K, n and eps0 (Swift hardening).
-# Core master does not read them yet; Cody's change is on agent/cm1-friction-tangent.
-CORE_SWIFT_SUPPORTED = False
+# Core's v2 ElastoPlasticIsotropic reads K, n and eps0 (Swift hardening) since Core master 35029aa.
+# Set to False to mark such exports draft again.
+CORE_SWIFT_SUPPORTED = True
 SI_UNITS = {
     "length": "m",
     "time": "s",
