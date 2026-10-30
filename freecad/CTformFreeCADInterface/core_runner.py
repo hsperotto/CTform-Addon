@@ -88,6 +88,28 @@ def collect_outputs(output_directory: str | Path) -> tuple[list[Path], Path | No
     return steps, force_csv if force_csv.is_file() else None
 
 
+def step_times(steps: Sequence[Path], force_csv: str | Path | None) -> list[float]:
+    """Return the simulation time of each step file, read from press_force_by_tool.csv.
+
+    Falls back to the step index when the CSV has no row for a step.
+    """
+    times: dict[int, float] = {}
+    if force_csv and Path(force_csv).is_file():
+        for line in Path(force_csv).read_text(encoding="utf-8", errors="replace").splitlines()[1:]:
+            fields = line.split(",")
+            if len(fields) >= 2:
+                try:
+                    times.setdefault(int(fields[0]), float(fields[1]))
+                except ValueError:
+                    continue
+    result = []
+    for position, path in enumerate(steps, start=1):
+        digits = re.findall(r"\d+", Path(path).stem)
+        number = int(digits[-1]) if digits else position
+        result.append(times.get(number, float(number)))
+    return result
+
+
 def run_core(
     core_executable: str | Path,
     case_json: str | Path,

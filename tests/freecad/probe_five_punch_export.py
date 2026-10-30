@@ -150,7 +150,7 @@ def build():
     step.StepName = "Press"
     step.StartTime = 0.0
     step.EndTime = duration
-    step.Increments = 100
+    step.Increments = int(os.environ.get("CTFORM_PROBE_INCREMENTS", "100"))
 
     punch_disp = ObjectsFem.makeConstraintDisplacement(doc, "PunchDisplacement")
     punch_disp.References = [(punch, "Face1")]

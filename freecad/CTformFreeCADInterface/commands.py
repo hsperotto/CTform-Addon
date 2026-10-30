@@ -446,6 +446,29 @@ class RunCoreCommand:
         timer.start()
         self._timer = timer
 
+    def _import_results(self, result):
+        """Load the step files as one scrubbable FEM post-processing result.
+
+        Core writes the meridian plane as X (radius) and Z (axial); the model
+        was drawn with Y axial, so the result lies in the XZ plane.
+        """
+        from .core_runner import step_times
+
+        if not result.steps:
+            return
+        doc = App.ActiveDocument
+        pipeline = doc.addObject("Fem::FemPostPipeline", "CTformResult")
+        pipeline.Label = "CTform Result"
+        times = step_times(result.steps, result.force_csv)
+        pipeline.read([str(path) for path in result.steps], times, App.Units.Unit("T"), "Time")
+        analysis = analysis_for_case(find_case(doc))
+        if analysis is not None:
+            analysis.addObject(pipeline)
+        doc.recompute()
+        view = getattr(pipeline, "ViewObject", None)
+        if view is not None:
+            view.DisplayMode = "Surface"
+
     def _report(self, outcome, window):
         if "error" in outcome:
             QtWidgets.QMessageBox.warning(window, "Run CTform Core", str(outcome["error"]))
@@ -459,6 +482,7 @@ class RunCoreCommand:
         )
         if result.timed_out:
             summary += "; the process was stopped after the time limit"
+        self._import_results(result)
         App.Console.PrintMessage(f"CTform Core finished: {summary}\n")
         QtWidgets.QMessageBox.information(window, "Run CTform Core", summary.replace("; ", "\n"))
 

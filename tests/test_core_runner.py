@@ -12,6 +12,7 @@ from freecad.CTformFreeCADInterface.core_runner import (
     collect_outputs,
     parse_log,
     run_core,
+    step_times,
 )
 
 LOG = """\
@@ -58,6 +59,16 @@ class CoreRunnerTests(unittest.TestCase):
 
             self.assertEqual([p.name for p in steps], ["case_step_1.vtk", "case_step_2.vtk", "case_step_10.vtk"])
             self.assertEqual(force_csv.name, "press_force_by_tool.csv")
+
+    def test_step_times_come_from_the_force_csv(self):
+        with TemporaryDirectory() as folder:
+            csv = Path(folder) / "press_force_by_tool.csv"
+            csv.write_text("Step,Time,Tool,Force\n1,0.1,Punch,0\n1,0.1,Die,0\n3,0.3,Punch,5\n")
+            steps = [Path(folder) / "case_step_1.vtk", Path(folder) / "case_step_2.vtk",
+                     Path(folder) / "case_step_3.vtk"]
+
+            self.assertEqual(step_times(steps, csv), [0.1, 2.0, 0.3])
+            self.assertEqual(step_times(steps, None), [1.0, 2.0, 3.0])
 
     def test_run_collects_log_warnings_and_outputs(self):
         with TemporaryDirectory() as folder:

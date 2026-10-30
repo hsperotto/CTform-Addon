@@ -41,7 +41,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   and reports convergence, package warnings and step files (`core_runner.py`).
 - Contact interfaces name their master tool explicitly (`masterBody`,
   `masterToolId`, `master.name/toolId`) and the workpiece slave group.
-- 77 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- 78 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
