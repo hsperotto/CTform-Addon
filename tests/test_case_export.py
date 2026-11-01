@@ -913,6 +913,7 @@ class CaseExportTests(unittest.TestCase):
         solver = SimpleNamespace(
             RemeshEnabled=True, RemeshEngine="gmsh", RemeshInterval=10, RemeshMinIncrements=10,
             RemeshMaxSteps=40, RemeshHBase=0.25, RemeshHMin=0.2, RemeshHMax=0.3,
+            RemeshQualityMinScoreRetention=0.5,
         )
 
         block = _remesh(solver)
@@ -920,6 +921,7 @@ class CaseExportTests(unittest.TestCase):
         self.assertEqual(block, {
             "enabled": True, "engine": "gmsh", "interval": 10, "minIncrementsBetweenRemesh": 10,
             "maxRemeshSteps": 40, "hBase": 0.00025, "hMin": 0.0002, "hMax": 0.0003,
+            "qualityMinScoreRetention": 0.5,
         })
         self.assertEqual(_remesh(SimpleNamespace(RemeshEnabled=False)), {"enabled": False})
 

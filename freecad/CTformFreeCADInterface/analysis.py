@@ -139,6 +139,8 @@ class CTformSolver:
             ("RemeshHBase", "Remesh", 0.25),
             ("RemeshHMin", "Remesh", 0.2),
             ("RemeshHMax", "Remesh", 0.3),
+            # Fraction of the old mesh quality score the new mesh must keep (dimensionless).
+            ("RemeshQualityMinScoreRetention", "Remesh", 0.5),
         )
         for name, group, default in float_properties:
             add_property(obj, name, "App::PropertyFloat", group, default)

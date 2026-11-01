@@ -380,6 +380,7 @@ def _remesh(solver: object | None) -> dict[str, Any]:
         "hBase": length_to_si(_value(solver, "RemeshHBase", 0.25)),
         "hMin": length_to_si(_value(solver, "RemeshHMin", 0.2)),
         "hMax": length_to_si(_value(solver, "RemeshHMax", 0.3)),
+        "qualityMinScoreRetention": float(_value(solver, "RemeshQualityMinScoreRetention", 0.5)),
     }
 
 

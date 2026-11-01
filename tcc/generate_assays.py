@@ -85,6 +85,7 @@ REMESH_SETTINGS = {
     "RemeshHBase": float(os.environ.get("CTFORM_TCC_REMESH_H_BASE", "0.25")),
     "RemeshHMin": float(os.environ.get("CTFORM_TCC_REMESH_H_MIN", "0.2")),
     "RemeshHMax": float(os.environ.get("CTFORM_TCC_REMESH_H_MAX", "0.3")),
+    "RemeshQualityMinScoreRetention": float(os.environ.get("CTFORM_TCC_REMESH_QUALITY_RETENTION", "0.5")),
 }
 MESH_SCALE = float(os.environ.get("CTFORM_TCC_MESH_SCALE", "1"))
 
