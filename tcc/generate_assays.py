@@ -84,8 +84,8 @@ REMESH_SETTINGS = {
     "RemeshMinIncrements": int(os.environ.get("CTFORM_TCC_REMESH_MIN_INC", "10")),
     "RemeshMaxSteps": int(os.environ.get("CTFORM_TCC_REMESH_MAX_STEPS", "40")),
     "RemeshHBase": float(os.environ.get("CTFORM_TCC_REMESH_H_BASE", "0.25")),
-    "RemeshHMin": float(os.environ.get("CTFORM_TCC_REMESH_H_MIN", "0.2")),
-    "RemeshHMax": float(os.environ.get("CTFORM_TCC_REMESH_H_MAX", "0.3")),
+    "RemeshHMin": float(os.environ.get("CTFORM_TCC_REMESH_H_MIN", "0.25")),
+    "RemeshHMax": float(os.environ.get("CTFORM_TCC_REMESH_H_MAX", "0.25")),
     "RemeshQualityMinScoreRetention": float(os.environ.get("CTFORM_TCC_REMESH_QUALITY_RETENTION", "0.5")),
 }
 # Optional strain-rate sensitivity of the sheet (round 3 proposal; not the thesis default). Unset = rate independent.
