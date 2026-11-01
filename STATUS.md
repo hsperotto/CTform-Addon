@@ -61,7 +61,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 2. Run the SmokeTest package with Core `master` (the v2 reader and the v2 thermal/force BCs are in it).
 3. Validate contact-pair physical-group references; add conflict diagnostics.
 4. Geometry preflight: wire `validation.py` into the export, or delete it.
-5. Check Run CTform Core on a converging case. The import of `case_step_*.vtk` has not run on real output yet.
+5. Check Run CTform Core and the Results panel interactively in the FreeCAD GUI on the TCC cases when Core returns them (the VTK reader itself ran on probe9).
 
 ## Blocked
 - Five-punch cases abort at the first contact (Coulomb 0.2 and Levanov 0.2 fail with
@@ -86,6 +86,23 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - `properties.py` holds the single `add_property` and `length_to_si` helpers (were duplicated in five modules).
 - Removed the unused `CTform_CreateAnalysis` command alias.
 - Release prep: version 1.0.0 in `package.xml` and `pyproject.toml`, CHANGELOG entry. Tag 1.0.0 is the author's.
+
+## Results viewer, phases 0-2 (branch agent/results-viewer, 2026-11-01)
+- `results.py` (stdlib only): force CSV, stroke from first contact (displacement minus initial gap, with the
+  1 %-of-peak cross-check), ASCII VTK reader for Core step files, maximum of a field over the workpiece
+  with its (r, z), probe, line profile, summary CSV, `ResultsSession`. 13 tests in `tests/test_results.py`
+  (synthetic mini VTK); `CTFORM_REAL_RESULTS=1` also checks Core's probe9 output.
+- `results_panel.py` + command `CTform_ResultsPanel` (toolbar and menu): dock with force-vs-stroke plot
+  (click selects the step), step slider labelled with time and stroke, field list, maximum and location,
+  colour range, warp factor, probe, line plot, summary CSV. Run CTform Core still loads the 3D result.
+- Verified on real Core output (`C:\ctf-probesive-punch\probe9_gap0_mu0.2`, 3 steps, 87k points):
+  reads in ~2 s per step; the panel was driven offscreen in FreeCADCmd (all fields, probe, line, warp call, click).
+- NOT verified: the interactive GUI (docking, the 3D view's `Field`, `RangeMin/Max`, warp filter in the
+  tree), because FreeCADCmd has no view objects. `FemPostPipeline.Data` is None headless, so the pipeline's own
+  field list was not inspected. The pipeline's Frame labels round the time to 2 decimals ('0.02 T'); the panel
+  shows the exact time and stroke.
+- `Pressure` sign and terms (plan section 3): probe9 has only 3 steps (max 0.09 MPa), so still OPEN.
+- The stroke gap is 0 by default (all TCC cases start in contact); there is no gap field in the panel yet.
 
 ## Structured sheet mesh (branch agent/structured-sheet-mesh)
 - Workpiece property `StructuredSheetMesh` (default off) and `StructuredElementSize` (default 0.25 mm).
