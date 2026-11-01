@@ -334,3 +334,12 @@ All items are addressed on `agent/run-core-errors` and its follow-up commit. Ite
 2. Read `DEVELOPMENT-CONTEXT.md` for the design rules and `Core-Refactor.md` for the Core contract.
 3. Run the unit tests and the probe to see a working export.
 4. Open `case_export.py` at `case_to_dict` and follow it through the diagrams above.
+
+## Results viewer modules (added 2026-11-01)
+
+- `results.py`: pure Python. Forces and stroke from `press_force_by_tool.csv` and `loadsteps.json`, a minimal
+  ASCII VTK reader, maximum/probe/line profile, `ResultsSession`. Tests: `tests/test_results.py`.
+- `results_panel.py`: Qt dock widget (matplotlib canvases) over a `ResultsSession` and the `CTformResult`
+  pipeline. Opened by the `CTform_ResultsPanel` command in `commands.py`; `_load_pipeline` is shared with Run CTform Core.
+- `tcc/generate_assays.py`: headless generator of the thesis test packages (FreeCADCmd).
+

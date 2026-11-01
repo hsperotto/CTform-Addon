@@ -49,25 +49,42 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   and reports convergence, package warnings and step files (`core_runner.py`).
 - Contact interfaces name their master tool explicitly (`masterBody`,
   `masterToolId`, `master.name/toolId`) and the workpiece slave group.
-- Thesis test matrix (branch `agent/tcc-ensaios`): `tcc/Geometrias.FCStd` is a copy of the author's drawings
-  (5 punches, BlankHolder, Die, 3 blanks D90/100/110 x 1 mm). `tcc/generate_assays.py` (FreeCADCmd) builds
-  5 x 3 = 15 packages in `C:\ctf-probes\tcc\<Punch>_<Blank>` (all `ready`). Geometry is used as drawn
-  (punch, holder and die touch the blank at start; die opening R27 and entry R6, holder bore R27, cylindrical punch corner R6: Nunes 2025 values, set by the author on 2026-11-01). Stroke per punch and blank from Thay (STROKE_MM in the generator,
-  30 to 70 mm), 19.5 mm/s, holder 5 MPa with F = p*pi*(D0^2-54^2)/4 (thesis hypothesis), mu 0.2, 0.3 mm of punch
-  travel per increment (ADDON CHOICE, not in the thesis), sheet mesh 0.25 mm, `toolMeshSize` 0.5 mm per tool
-  (new optional export, metres). Not yet run in Core.
-- Remesh export (branch `agent/tcc-remesh`): Solver properties `RemeshEnabled`, `RemeshEngine`, `RemeshInterval`,
-  `RemeshMinIncrements`, `RemeshMaxSteps`, `RemeshHBase/HMin/HMax` (mm), `RemeshQualityMinScoreRetention` (0.5); `case.json` carries the full `remesh`
-  block in metres, and the "Core v2 does not support remeshing" readiness issue is gone. Only Core branch
-  `agent/v2-rigid-tool-segments` accepts it; Core `master` may still reject it. The TCC generator takes
-  `CTFORM_TCC_REMESH=1` and `CTFORM_TCC_REMESH_*`; remesh packages are in `C:/ctf-probes/tcc-remesh`.
-- Round-3 preparation (branch `agent/tcc-run3`): Hollomon `referenceStrainRate` (1/s, Material `HollomonReferenceStrainRate`, imported and exported only when > 0; Core
-  reads it on `agent/v2-rate-reference`) and generator switches `CTFORM_TCC_MRATE` / `CTFORM_TCC_REF_RATE`. Defaults unchanged. Round-3 packages (`C:/ctf-probes/tcc-run3`) NOT generated yet: m = 0.01 and ref 1e-3 change the thesis material, needs the author's yes and Thay's ok.
-- 81 unit tests pass (`python -m unittest discover -s tests`; pytest is not
+- Thesis test matrix (merged to `main` 2026-11-01): `tcc/Geometrias.FCStd` is a copy of the author's drawings
+  (5 punches, BlankHolder, Die, 3 blanks D90/100/110 x 1 mm, axisymmetric, mm). The original is
+  `Receba/Workspace/Geometrias.FCStd` (old values, untouched). Values changed by the author on 2026-11-01 to
+  Nunes 2025: die opening R27 and entry R6, holder bore R27, cylindrical punch corner R6.
+  `tcc/generate_assays.py` (FreeCADCmd) builds 5 x 3 = 15 packages, all `ready`, to `CTFORM_TCC_OUT`
+  (`C:/ctf-probes/tcc` without remesh, `C:/ctf-probes/tcc-remesh` with remesh; Cody reads both, do not
+  overwrite them while a run is going). Punch, holder and die touch the blank at start (gap 0).
+  Strokes per punch and blank come from Thay (`STROKE_MM`, 30 to 70 mm, Nunes Figs. 24/26/28), 19.5 mm/s,
+  holder F = p*pi*(D0^2-54^2)/4 at 5 MPa (thesis hypothesis), Coulomb mu 0.2, sheet mesh 0.25 mm.
+  Addon choices, NOT in the thesis: 0.3 mm of punch travel per increment and `toolMeshSize` 0.5 mm.
+  All generator switches are `CTFORM_TCC_*` (see the script's docstring).
+- Optional `toolMeshSize` per tool (Tool property `ToolMeshSize`, mm, exported in metres; Core multiplies by
+  1e3). Without it Core reuses the sheet element size on the tool and Gmsh times out.
+- Remesh export: Solver properties `RemeshEnabled`, `RemeshEngine`, `RemeshInterval`, `RemeshMinIncrements`,
+  `RemeshMaxSteps`, `RemeshHBase/HMin/HMax` (mm), `RemeshQualityMinScoreRetention`. `case.json` carries the full
+  `remesh` block in metres; the "Core v2 does not support remeshing" readiness issue is gone. Only Core branch
+  `agent/v2-rigid-tool-segments` accepts the block; Core `master` may reject it.
+- Hollomon `referenceStrainRate` (1/s, Material `HollomonReferenceStrainRate`; exported only when > 0; Core
+  reads it on `agent/v2-rate-reference`). Generator switches `CTFORM_TCC_MRATE` / `CTFORM_TCC_REF_RATE`.
+  Defaults unchanged. No round-3 rate-sensitive packages were generated: the aborts were numerical, in Core's
+  Newton, so the thesis material stays as it is.
+- 123 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
 ## In progress
-- Nothing open on the addon side. Merged branches stay on origin until the author deletes them.
+- TCC campaign (2026-11-01): the author paused all Core runs to decide how to proceed. Cody (Core session)
+  found that the round 1 and 2 aborts were numerical (Newton merit gamma = 1e7, blind alpha = 0.5); the CLI
+  settings `flow_gamma_fixed=1` and `flow_linesearch_bootstrap=0` fix them. Round 3 (packages of
+  `C:/ctf-probes/tcc-remesh`) broke at the second remesh (increment 20): a Core bug (Gmsh full-quad failure
+  and a template fallback that zeroed the material state), to be fixed in Core.
+- Pre-authorisation (author, 2026-11-01): regenerating TCC case files on Cody's request needs no new approval,
+  but the drawn geometry, the 15-case matrix, the thesis values and merges to `main` do.
+- Offered, not done (wait for the author): write `run.tuning` (`flow_gamma_fixed`, `flow_linesearch_bootstrap`)
+  into `case.json` `run`, which Core passes on from `agent/v2-rate-reference` (fdfaaa9).
+- All addon branches are merged. Merged branches stay on origin until the author deletes them. Nothing was
+  pushed or tagged.
 
 ## Next
 1. Fresh interactive run of `MANUAL-SMOKE-TEST.md` in FreeCAD. Restart FreeCAD first to pick up
@@ -75,14 +92,21 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 2. Run the SmokeTest package with Core `master` (the v2 reader and the v2 thermal/force BCs are in it).
 3. Validate contact-pair physical-group references; add conflict diagnostics.
 4. Geometry preflight: wire `validation.py` into the export, or delete it.
-5. Check Run CTform Core and the Results panel interactively in the FreeCAD GUI on the TCC cases when Core returns them (the VTK reader itself ran on probe9).
+5. Check Run CTform Core and the Results panel interactively in the FreeCAD GUI on the TCC cases when Core returns them (the VTK reader itself ran on probe9). Also confirm the `Pressure` sign on a longer run.
+6. Results viewer phases 3+ of `docs/RESULTS-VIEWER-PLAN.md` (not started).
 
 ## Blocked
-- Five-punch cases abort at the first contact (Coulomb 0.2 and Levanov 0.2 fail with
-  `line_search_failed_all_lambdas`) on Core `08e9ac4`. Core task C-M1 (friction treatment in the
-  flow formulation). Probe packages: `C:\ctf-probes\five-punch`.
+- Nothing is blocked on the addon side. The old five-punch aborts (Core `08e9ac4`, task C-M1) were fixed in Core
+  (see below), and the TCC aborts were Core's Newton (Cody, 2026-11-01). Waiting on the Core fix for the
+  second-remesh failure and on the author's decision on how to continue. Old probe packages:
+  `C:/ctf-probes/five-punch`.
 - Per-pair penalty (`normal.penalty`) is exported but Core v2 ignores it until Core accepts the key.
 
+
+## Core reference (checked 2026-11-01, via Cody)
+- Core `master` is 96e4e6d (includes 35029aa). Branches the TCC packages depend on: `agent/v2-rigid-tool-segments`
+  (3754039: rigid tools are the DXF outline only, no volume mesh; remesh in v2) and `agent/v2-rate-reference`
+  (3a490ca, fdfaaa9: `referenceStrainRate`, `run.tuning`).
 
 ## Core reference (checked 2026-10-30)
 - Core `master` 35029aa has Swift hardening, the displacement formulation (pure Quad4), force-controlled
@@ -101,7 +125,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - Removed the unused `CTform_CreateAnalysis` command alias.
 - Release prep: version 1.0.0 in `package.xml` and `pyproject.toml`, CHANGELOG entry. Tag 1.0.0 is the author's.
 
-## Results viewer, phases 0-2 (branch agent/results-viewer, 2026-11-01)
+## Results viewer, phases 0-2 (merged to main 2026-11-01)
 - `results.py` (stdlib only): force CSV, stroke from first contact (displacement minus initial gap, with the
   1 %-of-peak cross-check), ASCII VTK reader for Core step files, maximum of a field over the workpiece
   with its (r, z), probe, line profile, summary CSV, `ResultsSession`. 13 tests in `tests/test_results.py`

@@ -6,6 +6,22 @@
 Versions follow semantic versioning (MAJOR.MINOR.PATCH). The case package schema
 (`SCHEMA_VERSION = 2`) is versioned separately; a package-format change is a MAJOR bump.
 
+## [Unreleased]
+
+Not tagged: the author creates tags.
+
+### Added
+
+- Thesis test matrix: `tcc/Geometrias.FCStd` and `tcc/generate_assays.py` (5 punches x 3 blanks).
+- Tool property `ToolMeshSize` exported as `toolMeshSize` (metres).
+- Full `remesh` block (engine, interval, h sizes, `qualityMinScoreRetention`) and Solver remesh properties.
+- Hollomon `referenceStrainRate` (exported only when set).
+- Results viewer: `results.py`, the CTform Results panel and the `CTform_ResultsPanel` command.
+
+### Changed
+
+- The "Core v2 does not support remeshing" readiness issue was removed.
+
 ## [1.0.0] - 2026-10-30
 
 First release aligned with CTform Core v2 and used for the five-punch validation.
