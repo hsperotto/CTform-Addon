@@ -95,7 +95,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - `results_panel.py` + command `CTform_ResultsPanel` (toolbar and menu): dock with force-vs-stroke plot
   (click selects the step), step slider labelled with time and stroke, field list, maximum and location,
   colour range, warp factor, probe, line plot, summary CSV. Run CTform Core still loads the 3D result.
-- Verified on real Core output (`C:/ctf-probes/five-punch\probe9_gap0_mu0.2`, 3 steps, 87k points):
+- Verified on real Core output (`C:/ctf-probes/five-punch/probe9_gap0_mu0.2`, 3 steps, 87k points):
   reads in ~2 s per step; the panel was driven offscreen in FreeCADCmd (all fields, probe, line, warp call, click).
 - NOT verified: the interactive GUI (docking, the 3D view's `Field`, `RangeMin/Max`, warp filter in the
   tree), because FreeCADCmd has no view objects. `FemPostPipeline.Data` is None headless, so the pipeline's own
