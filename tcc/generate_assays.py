@@ -16,7 +16,8 @@ taken from probe_five_punch_export.py: stroke, press speed, holder pressure,
 friction, mesh size. Optional switches:
 
     CTFORM_TCC_ONLY       comma list of case names to build (e.g. Cilinder_Blank90)
-    CTFORM_TCC_STROKE     punch travel, mm (default 30)
+    CTFORM_TCC_STROKE     one punch travel for all cases, mm (default: STROKE_MM table)
+    CTFORM_TCC_INCREMENT_MM  punch travel per increment, mm (default 0.3)
     CTFORM_TCC_PUNCH_GAP  initial punch-to-blank gap, mm (default 0 = as drawn)
     CTFORM_TCC_HOLDER_GAP initial holder-to-blank gap, mm (default 0 = as drawn)
     CTFORM_TCC_MU         Coulomb friction (0 exports friction none; default 0.2)
@@ -52,7 +53,21 @@ MATERIAL = "AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)"
 PUNCHES = ["Cilinder", "Hemisphere", "FlatElipse", "DeepElipse", "VeryDeepElipse"]
 BLANKS = ["Blank90", "Blank100", "Blank110"]
 
-STROKE = float(os.environ.get("CTFORM_TCC_STROKE", "30"))
+# Punch travel from first contact, mm (Thay: Nunes 2025 Figs. 24/26/28, +-1 mm, rounded up to
+# multiples of 5; source CTform-Thesis tools/casematrix.py STROKE_MM). VeryDeepElipse D90 is
+# not an experiment in the thesis: it repeats the 100 mm value per Thay's table.
+STROKE_MM = {
+    "Cilinder": {"Blank90": 30, "Blank100": 40, "Blank110": 30},
+    "FlatElipse": {"Blank90": 35, "Blank100": 40, "Blank110": 35},
+    "Hemisphere": {"Blank90": 45, "Blank100": 50, "Blank110": 70},
+    "DeepElipse": {"Blank90": 50, "Blank100": 60, "Blank110": 45},
+    "VeryDeepElipse": {"Blank90": 55, "Blank100": 45, "Blank110": 45},
+}
+STROKE_OVERRIDE = os.environ.get("CTFORM_TCC_STROKE")  # one stroke for every case, mm
+# Increments are NOT defined in the thesis: this is an addon choice (~0.3 mm of punch travel
+# each, the ratio of the earlier 100 increments for 30 mm), to be confirmed by the author.
+INCREMENT_MM = float(os.environ.get("CTFORM_TCC_INCREMENT_MM", "0.3"))
+HOLDER_FORCE_BORE_RADIUS = 27.0  # mm; thesis hypothesis F = p*pi*(D0^2 - 54^2)/4 (Nunes die opening)
 PUNCH_GAP = float(os.environ.get("CTFORM_TCC_PUNCH_GAP", "0"))
 HOLDER_GAP = float(os.environ.get("CTFORM_TCC_HOLDER_GAP", "0"))
 FRICTION = float(os.environ.get("CTFORM_TCC_MU", "0.2"))
@@ -119,12 +134,13 @@ def build(shapes, punch_name, blank_name):
         pair.FrictionModel = "coulomb" if FRICTION > 0 else "none"
         pair.FrictionCoefficient = FRICTION
 
-    total = PUNCH_GAP + STROKE
+    stroke = float(STROKE_OVERRIDE) if STROKE_OVERRIDE else float(STROKE_MM[punch_name][blank_name])
+    total = PUNCH_GAP + stroke
     step = loadsteps.make_load_step(doc, fem)
     step.StepName = "Press"
     step.StartTime = 0.0
     step.EndTime = total / PRESS_SPEED
-    step.Increments = 100
+    step.Increments = max(1, math.ceil(total / INCREMENT_MM))
 
     punch_disp = ObjectsFem.makeConstraintDisplacement(doc, "PunchDisplacement")
     punch_disp.References = [(punch, "Face1")]
@@ -160,8 +176,7 @@ def build(shapes, punch_name, blank_name):
     doc.recompute()
     holder_force.Direction = (down, ["Edge1"])
     blank_radius = sheet.Shape.BoundBox.XMax
-    bore_radius = holder.Shape.BoundBox.XMin
-    area = math.pi * (blank_radius ** 2 - bore_radius ** 2)  # contact annulus, mm2
+    area = math.pi * (blank_radius ** 2 - HOLDER_FORCE_BORE_RADIUS ** 2)  # mm2, thesis formula
     holder_force.Force = f"{PRESSURE_MPA * area} N"
     fem.addObject(holder_force)
     loadsteps.attach_condition(step, holder_force)

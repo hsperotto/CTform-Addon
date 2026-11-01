@@ -52,8 +52,11 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - Thesis test matrix (branch `agent/tcc-ensaios`): `tcc/Geometrias.FCStd` is a copy of the author's drawings
   (5 punches, BlankHolder, Die, 3 blanks D90/100/110 x 1 mm). `tcc/generate_assays.py` (FreeCADCmd) builds
   5 x 3 = 15 packages in `C:\ctf-probes\tcc\<Punch>_<Blank>` (all `ready`). Geometry is used as drawn
-  (punch, holder and die touch the blank at start; clearance 0.6 mm per side). Stroke 30 mm, 19.5 mm/s,
-  holder 5 MPa, mu 0.2, 0.25 mm mesh are PLACEHOLDERS. Not yet run in Core.
+  (punch, holder and die touch the blank at start; clearance 0.6 mm per side; Nunes has opening o54 and entry R6,
+  the drawing has R25.6 and R5: author decides). Stroke per punch and blank from Thay (STROKE_MM in the generator,
+  30 to 70 mm), 19.5 mm/s, holder 5 MPa with F = p*pi*(D0^2-54^2)/4 (thesis hypothesis), mu 0.2, 0.3 mm of punch
+  travel per increment (ADDON CHOICE, not in the thesis), sheet mesh 0.25 mm, `toolMeshSize` 0.5 mm per tool
+  (new optional export, metres). Not yet run in Core.
 - 81 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
