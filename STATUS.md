@@ -3,6 +3,9 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- TCC generator turns on `StructuredSheetMesh` (element size 0.25 mm x `CTFORM_TCC_MESH_SCALE`),
+  so `workpiece.msh` is Quad4 (checked on Cilinder_Blank100: `elementTypes ["Quad4"]`, groups
+  Edge1-4 and Face1 unchanged). No Tri3 validation added; Tri3 stays possible elsewhere. Batch not regenerated.
 - FreeCAD 1.1 workbench: case, solver, Workpiece/Tool folders, shared material
   catalog, Gmsh MSH2 mesh, contact pairs, load steps, native FEM conditions.
 - v2 package export (`case.json`, `materials.json`, `thermal.json`,

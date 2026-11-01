@@ -153,6 +153,9 @@ def build(shapes, punch_name, blank_name):
     mesh.CharacteristicLengthMin = f"{0.1 * MESH_SCALE} mm"
     workpiece.Mesh = mesh
     workpiece.addObject(mesh)
+    # Transfinite recombined Quad4 grid (4 elements through the 1 mm thickness).
+    workpiece.StructuredSheetMesh = True
+    workpiece.StructuredElementSize = f"{0.25 * MESH_SCALE} mm"
     doc.recompute()
 
     for tool in tools.values():
