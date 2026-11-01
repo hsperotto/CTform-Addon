@@ -73,7 +73,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 ## Core reference (checked 2026-10-30)
 - Core `master` 35029aa has Swift hardening, the displacement formulation (pure Quad4), force-controlled
   tools solved in Newton and the C-M1 friction fix. `CORE_SWIFT_SUPPORTED = True`: Swift exports are no longer draft.
-  Probes 17-21 (`C:\ctf-probesive-punch`, Quad4 displacement) are being run by Cody.
+  Probes 17-21 (`C:/ctf-probes/five-punch`, Quad4 displacement) are being run by Cody.
 - Core `master` contains `agent/v2-thermal-bcs` (a462978 and later), so the earlier wait on that
   branch is over. Core `master` HEAD is `6fa07e9`, a work-in-progress force-servo commit on top.
   The probe runs used `08e9ac4`.
@@ -95,7 +95,7 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 - `results_panel.py` + command `CTform_ResultsPanel` (toolbar and menu): dock with force-vs-stroke plot
   (click selects the step), step slider labelled with time and stroke, field list, maximum and location,
   colour range, warp factor, probe, line plot, summary CSV. Run CTform Core still loads the 3D result.
-- Verified on real Core output (`C:\ctf-probesive-punch\probe9_gap0_mu0.2`, 3 steps, 87k points):
+- Verified on real Core output (`C:/ctf-probes/five-punch\probe9_gap0_mu0.2`, 3 steps, 87k points):
   reads in ~2 s per step; the panel was driven offscreen in FreeCADCmd (all fields, probe, line, warp call, click).
 - NOT verified: the interactive GUI (docking, the 3D view's `Field`, `RangeMin/Max`, warp filter in the
   tree), because FreeCADCmd has no view objects. `FemPostPipeline.Data` is None headless, so the pipeline's own
