@@ -23,6 +23,8 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_MU         Coulomb friction (0 exports friction none; default 0.2)
     CTFORM_TCC_FORMULATION  flow (default) or displacement
     CTFORM_TCC_TOOL_MESH  tool-profile element size, mm (default 0.5)
+    CTFORM_TCC_REMESH=1   export the remesh block (Core v2 on agent/v2-rigid-tool-segments); CTFORM_TCC_REMESH_*
+                          set interval, min increments, max steps and h (mm); see REMESH_SETTINGS
     CTFORM_TCC_MESH_SCALE   multiplies the 0.25 mm sheet element size
 """
 
@@ -74,6 +76,16 @@ FRICTION = float(os.environ.get("CTFORM_TCC_MU", "0.2"))
 PRESS_SPEED = 19.5  # mm/s, Rocha (2022); placeholder
 PRESSURE_MPA = 5.0  # blank holder pressure; placeholder
 TOOL_MESH_SIZE = float(os.environ.get("CTFORM_TCC_TOOL_MESH", "0.5"))  # mm; resolves the 5 mm radii
+REMESH = os.environ.get("CTFORM_TCC_REMESH") == "1"
+# Remesh settings; sizes in mm (exported in metres). Switches: CTFORM_TCC_REMESH_{INTERVAL,MIN_INC,MAX_STEPS,H_BASE,H_MIN,H_MAX}
+REMESH_SETTINGS = {
+    "RemeshInterval": int(os.environ.get("CTFORM_TCC_REMESH_INTERVAL", "10")),
+    "RemeshMinIncrements": int(os.environ.get("CTFORM_TCC_REMESH_MIN_INC", "10")),
+    "RemeshMaxSteps": int(os.environ.get("CTFORM_TCC_REMESH_MAX_STEPS", "40")),
+    "RemeshHBase": float(os.environ.get("CTFORM_TCC_REMESH_H_BASE", "0.25")),
+    "RemeshHMin": float(os.environ.get("CTFORM_TCC_REMESH_H_MIN", "0.2")),
+    "RemeshHMax": float(os.environ.get("CTFORM_TCC_REMESH_H_MAX", "0.3")),
+}
 MESH_SCALE = float(os.environ.get("CTFORM_TCC_MESH_SCALE", "1"))
 
 
@@ -100,6 +112,11 @@ def build(shapes, punch_name, blank_name):
     solver.MechanicalFormulation = os.environ.get("CTFORM_TCC_FORMULATION", "flow")
     analysis.apply_isothermal_preset(solver)
     solver.ExportTargetCompression = False
+    if REMESH:
+        solver.RemeshEnabled = True
+        solver.RemeshEngine = "gmsh"
+        for name, value in REMESH_SETTINGS.items():
+            setattr(solver, name, value)
 
     sheet = feature(doc, "Sheet", shapes[blank_name])
     punch = feature(doc, "PunchShape", shapes[punch_name], dy=PUNCH_GAP)

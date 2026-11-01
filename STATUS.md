@@ -56,6 +56,11 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   30 to 70 mm), 19.5 mm/s, holder 5 MPa with F = p*pi*(D0^2-54^2)/4 (thesis hypothesis), mu 0.2, 0.3 mm of punch
   travel per increment (ADDON CHOICE, not in the thesis), sheet mesh 0.25 mm, `toolMeshSize` 0.5 mm per tool
   (new optional export, metres). Not yet run in Core.
+- Remesh export (branch `agent/tcc-remesh`): Solver properties `RemeshEnabled`, `RemeshEngine`, `RemeshInterval`,
+  `RemeshMinIncrements`, `RemeshMaxSteps`, `RemeshHBase/HMin/HMax` (mm); `case.json` carries the full `remesh`
+  block in metres, and the "Core v2 does not support remeshing" readiness issue is gone. Only Core branch
+  `agent/v2-rigid-tool-segments` accepts it; Core `master` may still reject it. The TCC generator takes
+  `CTFORM_TCC_REMESH=1` and `CTFORM_TCC_REMESH_*`; remesh packages are in `C:/ctf-probes/tcc-remesh`.
 - 81 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
