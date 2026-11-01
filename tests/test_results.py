@@ -108,10 +108,9 @@ class ForceAndStrokeTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "f.csv"
             path.write_text(
-                "Step,Time,Tool,Force,Force_Friction,Force_Total
-1,0.5,Punch,10,2,12
-2,1.0,Punch,20,3,23
-",
+                "Step,Time,Tool,Force,Force_Friction,Force_Total\n"
+                "1,0.5,Punch,10,2,12\n"
+                "2,1.0,Punch,20,3,23\n",
                 encoding="utf-8",
             )
             series = results.read_force_csv(path)
