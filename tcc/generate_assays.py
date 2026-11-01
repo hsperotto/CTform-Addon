@@ -21,6 +21,7 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_HOLDER_GAP initial holder-to-blank gap, mm (default 0 = as drawn)
     CTFORM_TCC_MU         Coulomb friction (0 exports friction none; default 0.2)
     CTFORM_TCC_FORMULATION  flow (default) or displacement
+    CTFORM_TCC_TOOL_MESH  tool-profile element size, mm (default 0.5)
     CTFORM_TCC_MESH_SCALE   multiplies the 0.25 mm sheet element size
 """
 
@@ -57,6 +58,7 @@ HOLDER_GAP = float(os.environ.get("CTFORM_TCC_HOLDER_GAP", "0"))
 FRICTION = float(os.environ.get("CTFORM_TCC_MU", "0.2"))
 PRESS_SPEED = 19.5  # mm/s, Rocha (2022); placeholder
 PRESSURE_MPA = 5.0  # blank holder pressure; placeholder
+TOOL_MESH_SIZE = float(os.environ.get("CTFORM_TCC_TOOL_MESH", "0.5"))  # mm; resolves the 5 mm radii
 MESH_SCALE = float(os.environ.get("CTFORM_TCC_MESH_SCALE", "1"))
 
 
@@ -100,6 +102,7 @@ def build(shapes, punch_name, blank_name):
     workpiece.Material = imported[MATERIAL]
     for tool in tools.values():
         tool.Material = imported["Rigid Tool Steel (placeholder)"]
+        tool.ToolMeshSize = TOOL_MESH_SIZE
 
     mesh = ObjectsFem.makeMeshGmsh(doc, "SheetMesh")
     mesh.Shape = sheet

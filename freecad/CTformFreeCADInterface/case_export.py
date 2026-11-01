@@ -1168,6 +1168,9 @@ def _geometry_from_components(
         tool["toolLayer"] = getattr(tool_component, "ToolLayer", "") or "ToolProfile"
         tool["initialOffsetZ"] = length_to_si(getattr(tool_component, "InitialOffsetZ", 0.0))
         tool["symmetryR"] = length_to_si(getattr(tool_component, "SymmetryR", 0.0))
+        mesh_size = float(getattr(tool_component, "ToolMeshSize", 0.0) or 0.0)
+        if mesh_size > 0.0:
+            tool["toolMeshSize"] = length_to_si(mesh_size)  # metres; Core scales by 1e3
         geometry["tools"].append(tool)
     return geometry
 

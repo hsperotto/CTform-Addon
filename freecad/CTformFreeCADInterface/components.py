@@ -70,6 +70,9 @@ class CTformTool:
         add_property(obj, "ToolLayer", "App::PropertyString", "Export", "ToolProfile")
         add_property(obj, "InitialOffsetZ", "App::PropertyFloat", "Export", 0.0)
         add_property(obj, "SymmetryR", "App::PropertyFloat", "Export", 0.0)
+        # Element size (mm) for Core's tool-profile mesh; 0 omits it and Core
+        # then reuses the sheet's element size (far too fine for a tool body).
+        add_property(obj, "ToolMeshSize", "App::PropertyFloat", "Export", 0.0)
 
 
 def make_workpiece(doc, analysis, case, shape, name="CTformWorkpiece"):

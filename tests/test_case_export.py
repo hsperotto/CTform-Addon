@@ -894,6 +894,20 @@ class CaseExportTests(unittest.TestCase):
         self.assertTrue(tools)
         self.assertTrue(all("role" not in item for item in tools))
 
+    def test_tool_mesh_size_is_exported_in_metres_only_when_set(self):
+        def tool(tool_id, size):
+            return SimpleNamespace(
+                ToolId=tool_id, ToolName=tool_id, Label=tool_id, Material=None,
+                ToolLayer="ToolProfile", InitialOffsetZ=0.0, SymmetryR=0.0, ToolMeshSize=size,
+            )
+
+        case = SimpleNamespace(Workpiece=None, Tools=[tool("punch", 0.5), tool("die", 0.0)])
+
+        tools = _geometry_from_components(case)["tools"]
+
+        self.assertEqual(tools[0]["toolMeshSize"], 0.0005)
+        self.assertNotIn("toolMeshSize", tools[1])
+
     def test_thermal_exports_initial_temperature_from_solver(self):
         solver = SimpleNamespace(
             InitialWorkpieceTemperature=1423.15, InitialToolTemperature=473.15
