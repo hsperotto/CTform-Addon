@@ -47,14 +47,18 @@ class ForceSeries:
 
 
 def read_force_csv(path: str | Path) -> dict[str, ForceSeries]:
-    """Return ``{tool name: ForceSeries}`` from ``press_force_by_tool.csv``."""
+    """Return ``{tool name: ForceSeries}`` from ``press_force_by_tool.csv``.
+
+    Uses ``Force_Total`` (normal + friction, the real vertical tool reaction; Core 4825fb9 and later)
+    when the column exists, otherwise ``Force`` (older CSVs: normal component only).
+    """
     series: dict[str, ForceSeries] = {}
     with open(path, newline="", encoding="utf-8", errors="replace") as handle:
         for row in csv.DictReader(handle):
             try:
                 step = int(row["Step"])
                 time = float(row["Time"])
-                force = float(row["Force"])
+                force = float(row["Force_Total"] if row.get("Force_Total") not in (None, "") else row["Force"])
             except (KeyError, TypeError, ValueError):
                 continue
             item = series.setdefault(row["Tool"], ForceSeries(row["Tool"]))

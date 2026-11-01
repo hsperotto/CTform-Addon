@@ -3,6 +3,8 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- Results viewer force series uses `Force_Total` (normal + friction) when `press_force_by_tool.csv` has it
+  (Core 4825fb9+), else `Force`. Branch agent/results-force-total, not merged.
 - TCC generator turns on `StructuredSheetMesh` (element size 0.25 mm x `CTFORM_TCC_MESH_SCALE`),
   so `workpiece.msh` is Quad4 (checked on Cilinder_Blank100: `elementTypes ["Quad4"]`, groups
   Edge1-4 and Face1 unchanged). No Tri3 validation added; Tri3 stays possible elsewhere. Batch not regenerated.

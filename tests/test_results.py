@@ -104,6 +104,19 @@ class ForceAndStrokeTests(unittest.TestCase):
         self.assertEqual(series["Punch"].forces, [0.0, 50.0, 200.0])
         self.assertEqual(series["Die"].steps, [1, 2, 3])
 
+    def test_force_csv_prefers_force_total_when_present(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "f.csv"
+            path.write_text(
+                "Step,Time,Tool,Force,Force_Friction,Force_Total
+1,0.5,Punch,10,2,12
+2,1.0,Punch,20,3,23
+",
+                encoding="utf-8",
+            )
+            series = results.read_force_csv(path)
+        self.assertEqual(series["Punch"].forces, [12.0, 23.0])
+
     def test_punch_displacement_follows_velocity_in_mm(self):
         profile = results.punch_velocity_profile(LOADSTEPS)
         self.assertEqual(profile, [(0.0, 2.0, -10.0)])
