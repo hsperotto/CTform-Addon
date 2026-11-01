@@ -93,6 +93,17 @@ class SwiftExportTests(unittest.TestCase):
         self.assertIn("eps0", exported["constitutive"]["parameters"])
         self.assertNotIn("yieldStress", exported["constitutive"]["parameters"])
 
+    def test_hollomon_reference_strain_rate_is_exported_only_when_set(self):
+        rate = material_to_dict(_material(
+            Model="Hollomon", HollomonK=1e9, HollomonN=0.34, HollomonRateExponent=0.01,
+            HollomonReferenceStrainRate=1e-3,
+        ))["constitutive"]["parameters"]
+        plain = material_to_dict(_material(Model="Hollomon", HollomonK=1e9, HollomonN=0.34))["constitutive"]["parameters"]
+
+        self.assertEqual(rate["mRate"], 0.01)
+        self.assertEqual(rate["referenceStrainRate"], 1e-3)
+        self.assertNotIn("referenceStrainRate", plain)
+
 
 class SwiftImportTests(unittest.TestCase):
     def test_catalog_record_round_trips_to_the_same_export(self):

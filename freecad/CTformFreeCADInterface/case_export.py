@@ -106,7 +106,7 @@ def case_to_dict(
             **_external_tools(solver),
         },
         "ale": {"enabled": _value(solver, "ALEEnabled", False)},
-        "remesh": {"enabled": _value(solver, "RemeshEnabled", False)},
+        "remesh": _remesh(solver),
         "solver": {},
         "packageStatus": "ready" if not readiness_issues else "draft",
         "readinessIssues": readiness_issues,
@@ -230,8 +230,6 @@ def _core_v2_unsupported_issues(
 ) -> list[str]:
     """Report features that Core's v2 reader rejects with an error."""
     issues = []
-    if solver is not None and _value(solver, "RemeshEnabled", False):
-        issues.append("Core v2 does not support remeshing yet; disable Remesh on the Solver.")
     element_types = set((mesh_info or {}).get("elementTypes") or ())
     if {"Tri3", "Quad4"} <= element_types:
         issues.append("Core v2 does not support meshes that mix Tri3 and Quad4 elements.")
@@ -367,6 +365,23 @@ def _target_compression(solver: object | None) -> dict[str, Any]:
     if not _value(solver, "ExportTargetCompression", True):
         return {}
     return {"targetCompression": length_to_si(_value(solver, "TargetCompression", 7.0))}
+
+
+def _remesh(solver: object | None) -> dict[str, Any]:
+    """Remesh block; the sizes are mm on the Solver and metres in the package."""
+    if not _value(solver, "RemeshEnabled", False):
+        return {"enabled": False}
+    return {
+        "enabled": True,
+        "engine": str(_value(solver, "RemeshEngine", "gmsh")),
+        "interval": int(_value(solver, "RemeshInterval", 10)),
+        "minIncrementsBetweenRemesh": int(_value(solver, "RemeshMinIncrements", 10)),
+        "maxRemeshSteps": int(_value(solver, "RemeshMaxSteps", 40)),
+        "hBase": length_to_si(_value(solver, "RemeshHBase", 0.25)),
+        "hMin": length_to_si(_value(solver, "RemeshHMin", 0.2)),
+        "hMax": length_to_si(_value(solver, "RemeshHMax", 0.3)),
+        "qualityMinScoreRetention": float(_value(solver, "RemeshQualityMinScoreRetention", 0.5)),
+    }
 
 
 def _external_tools(solver: object | None) -> dict[str, Any]:
@@ -1168,6 +1183,9 @@ def _geometry_from_components(
         tool["toolLayer"] = getattr(tool_component, "ToolLayer", "") or "ToolProfile"
         tool["initialOffsetZ"] = length_to_si(getattr(tool_component, "InitialOffsetZ", 0.0))
         tool["symmetryR"] = length_to_si(getattr(tool_component, "SymmetryR", 0.0))
+        mesh_size = float(getattr(tool_component, "ToolMeshSize", 0.0) or 0.0)
+        if mesh_size > 0.0:
+            tool["toolMeshSize"] = length_to_si(mesh_size)  # metres; Core scales by 1e3
         geometry["tools"].append(tool)
     return geometry
 

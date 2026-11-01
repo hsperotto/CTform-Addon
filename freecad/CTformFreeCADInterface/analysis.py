@@ -135,13 +135,25 @@ class CTformSolver:
             ("ZBottom", "Contact", 0.0),
             ("PlaneTolerance", "Model", 1e-7),
             ("CoreTimeoutMinutes", "External Tools", 0.0),  # 0 = no limit
+            # Remesh element sizes in mm (exported in metres); used when RemeshEnabled is on.
+            ("RemeshHBase", "Remesh", 0.25),
+            ("RemeshHMin", "Remesh", 0.2),
+            ("RemeshHMax", "Remesh", 0.3),
+            # Fraction of the old mesh quality score the new mesh must keep (dimensionless).
+            ("RemeshQualityMinScoreRetention", "Remesh", 0.5),
         )
         for name, group, default in float_properties:
             add_property(obj, name, "App::PropertyFloat", group, default)
 
-        integer_properties = (("VtkEvery", "Output", 1),)
+        integer_properties = (
+            ("VtkEvery", "Output", 1),
+            ("RemeshInterval", "Remesh", 10),
+            ("RemeshMinIncrements", "Remesh", 10),
+            ("RemeshMaxSteps", "Remesh", 40),
+        )
         for name, group, default in integer_properties:
             add_property(obj, name, "App::PropertyInteger", group, default)
+        add_property(obj, "RemeshEngine", "App::PropertyString", "Remesh", "gmsh")
 
         bool_properties = (
             ("NodalCsvEnabled", "Output", False),
@@ -150,7 +162,7 @@ class CTformSolver:
             ("ThermalContactEnabled", "Contact", False),
             ("ExportTargetCompression", "Run", True),
             ("ALEEnabled", "Advanced", False),
-            ("RemeshEnabled", "Advanced", False),
+            ("RemeshEnabled", "Remesh", False),
         )
         for name, group, default in bool_properties:
             add_property(obj, name, "App::PropertyBool", group, default)

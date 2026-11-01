@@ -49,6 +49,20 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   and reports convergence, package warnings and step files (`core_runner.py`).
 - Contact interfaces name their master tool explicitly (`masterBody`,
   `masterToolId`, `master.name/toolId`) and the workpiece slave group.
+- Thesis test matrix (branch `agent/tcc-ensaios`): `tcc/Geometrias.FCStd` is a copy of the author's drawings
+  (5 punches, BlankHolder, Die, 3 blanks D90/100/110 x 1 mm). `tcc/generate_assays.py` (FreeCADCmd) builds
+  5 x 3 = 15 packages in `C:\ctf-probes\tcc\<Punch>_<Blank>` (all `ready`). Geometry is used as drawn
+  (punch, holder and die touch the blank at start; die opening R27 and entry R6, holder bore R27, cylindrical punch corner R6: Nunes 2025 values, set by the author on 2026-11-01). Stroke per punch and blank from Thay (STROKE_MM in the generator,
+  30 to 70 mm), 19.5 mm/s, holder 5 MPa with F = p*pi*(D0^2-54^2)/4 (thesis hypothesis), mu 0.2, 0.3 mm of punch
+  travel per increment (ADDON CHOICE, not in the thesis), sheet mesh 0.25 mm, `toolMeshSize` 0.5 mm per tool
+  (new optional export, metres). Not yet run in Core.
+- Remesh export (branch `agent/tcc-remesh`): Solver properties `RemeshEnabled`, `RemeshEngine`, `RemeshInterval`,
+  `RemeshMinIncrements`, `RemeshMaxSteps`, `RemeshHBase/HMin/HMax` (mm), `RemeshQualityMinScoreRetention` (0.5); `case.json` carries the full `remesh`
+  block in metres, and the "Core v2 does not support remeshing" readiness issue is gone. Only Core branch
+  `agent/v2-rigid-tool-segments` accepts it; Core `master` may still reject it. The TCC generator takes
+  `CTFORM_TCC_REMESH=1` and `CTFORM_TCC_REMESH_*`; remesh packages are in `C:/ctf-probes/tcc-remesh`.
+- Round-3 preparation (branch `agent/tcc-run3`): Hollomon `referenceStrainRate` (1/s, Material `HollomonReferenceStrainRate`, imported and exported only when > 0; Core
+  reads it on `agent/v2-rate-reference`) and generator switches `CTFORM_TCC_MRATE` / `CTFORM_TCC_REF_RATE`. Defaults unchanged. Round-3 packages (`C:/ctf-probes/tcc-run3`) NOT generated yet: m = 0.01 and ref 1e-3 change the thesis material, needs the author's yes and Thay's ok.
 - 81 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 

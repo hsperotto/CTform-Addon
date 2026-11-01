@@ -14,6 +14,7 @@ from freecad.CTformFreeCADInterface.case_export import (
     thermal_to_dict,
     write_case_json,
     _core_v2_unsupported_issues,
+    _remesh,
     _geometry_from_components,
 )
 from freecad.CTformFreeCADInterface.contacts import contact_pair_to_dict
@@ -894,6 +895,36 @@ class CaseExportTests(unittest.TestCase):
         self.assertTrue(tools)
         self.assertTrue(all("role" not in item for item in tools))
 
+    def test_tool_mesh_size_is_exported_in_metres_only_when_set(self):
+        def tool(tool_id, size):
+            return SimpleNamespace(
+                ToolId=tool_id, ToolName=tool_id, Label=tool_id, Material=None,
+                ToolLayer="ToolProfile", InitialOffsetZ=0.0, SymmetryR=0.0, ToolMeshSize=size,
+            )
+
+        case = SimpleNamespace(Workpiece=None, Tools=[tool("punch", 0.5), tool("die", 0.0)])
+
+        tools = _geometry_from_components(case)["tools"]
+
+        self.assertEqual(tools[0]["toolMeshSize"], 0.0005)
+        self.assertNotIn("toolMeshSize", tools[1])
+
+    def test_remesh_block_is_exported_in_metres_when_enabled(self):
+        solver = SimpleNamespace(
+            RemeshEnabled=True, RemeshEngine="gmsh", RemeshInterval=10, RemeshMinIncrements=10,
+            RemeshMaxSteps=40, RemeshHBase=0.25, RemeshHMin=0.2, RemeshHMax=0.3,
+            RemeshQualityMinScoreRetention=0.5,
+        )
+
+        block = _remesh(solver)
+
+        self.assertEqual(block, {
+            "enabled": True, "engine": "gmsh", "interval": 10, "minIncrementsBetweenRemesh": 10,
+            "maxRemeshSteps": 40, "hBase": 0.00025, "hMin": 0.0002, "hMax": 0.0003,
+            "qualityMinScoreRetention": 0.5,
+        })
+        self.assertEqual(_remesh(SimpleNamespace(RemeshEnabled=False)), {"enabled": False})
+
     def test_thermal_exports_initial_temperature_from_solver(self):
         solver = SimpleNamespace(
             InitialWorkpieceTemperature=1423.15, InitialToolTemperature=473.15
@@ -945,8 +976,7 @@ class CaseExportTests(unittest.TestCase):
             SimpleNamespace(RemeshEnabled=True, MechanicalFormulation="displacement"),
         )
 
-        self.assertEqual(len(issues), 7)  # includes the whole-body convection and the Quad4-only rule
-        self.assertTrue(any("Remesh" in issue for issue in issues))
+        self.assertEqual(len(issues), 6)  # includes the whole-body convection and the Quad4-only rule
         self.assertTrue(any("Tri3 and Quad4" in issue for issue in issues))
         self.assertTrue(any("pure Quad4" in issue for issue in issues))
         self.assertTrue(any("CFlux" in issue for issue in issues))
