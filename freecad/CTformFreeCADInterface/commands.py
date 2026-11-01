@@ -374,6 +374,28 @@ class CreateContactPairCommand:
         Gui.Selection.addSelection(pair)
 
 
+def _load_pipeline(doc, steps, force_csv):
+    """Load the Core step files into one FEM post pipeline named CTformResult."""
+    from .core_runner import step_times
+
+    pipeline = doc.addObject("Fem::FemPostPipeline", "CTformResult")
+    try:
+        pipeline.Label = "CTform Result"
+        times = step_times(steps, force_csv)
+        pipeline.read([str(path) for path in steps], times, App.Units.Unit("T"), "Time")
+    except Exception:
+        doc.removeObject(pipeline.Name)
+        raise
+    analysis = analysis_for_case(find_case(doc))
+    if analysis is not None:
+        analysis.addObject(pipeline)
+    doc.recompute()
+    view = getattr(pipeline, "ViewObject", None)
+    if view is not None:
+        view.DisplayMode = "Surface"
+    return pipeline
+
+
 class RunCoreCommand:
     """Run CTform Core on the exported case package."""
 
@@ -464,25 +486,9 @@ class RunCoreCommand:
         Core writes the meridian plane as X (radius) and Z (axial); the model
         was drawn with Y axial, so the result lies in the XZ plane.
         """
-        from .core_runner import step_times
-
         if not result.steps:
             return
-        pipeline = doc.addObject("Fem::FemPostPipeline", "CTformResult")
-        try:
-            pipeline.Label = "CTform Result"
-            times = step_times(result.steps, result.force_csv)
-            pipeline.read([str(path) for path in result.steps], times, App.Units.Unit("T"), "Time")
-        except Exception:
-            doc.removeObject(pipeline.Name)
-            raise
-        analysis = analysis_for_case(find_case(doc))
-        if analysis is not None:
-            analysis.addObject(pipeline)
-        doc.recompute()
-        view = getattr(pipeline, "ViewObject", None)
-        if view is not None:
-            view.DisplayMode = "Surface"
+        _load_pipeline(doc, result.steps, result.force_csv)
 
     def _report(self, outcome, window, doc):
         if "error" in outcome:
@@ -504,6 +510,48 @@ class RunCoreCommand:
             summary += f"; results not loaded ({error})"
         App.Console.PrintMessage(f"CTform Core finished: {summary}\n")
         QtWidgets.QMessageBox.information(window, "Run CTform Core", summary.replace("; ", "\n"))
+
+
+class ResultsPanelCommand:
+    """Open the CTform Results panel on a Core output folder."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": _ICON_SOLVER,
+            "MenuText": "CTform Results",
+            "ToolTip": "Open the results panel: force vs stroke, fields, maximum, probe and line plot",
+        }
+
+    def IsActive(self):
+        return App.ActiveDocument is not None
+
+    def Activated(self):
+        from .core_runner import collect_outputs, step_times
+        from .results_panel import open_panel
+
+        doc = App.ActiveDocument
+        window = Gui.getMainWindow()
+        case = find_case(doc)
+        solver = find_solver(case) if case is not None else None
+        case_dir = Path(case.CaseDirectory) if case is not None and case.CaseDirectory else None
+        start = str(case_dir / (getattr(solver, "OutputDirectory", "") or "results_case")) if case_dir else ""
+        folder = QtWidgets.QFileDialog.getExistingDirectory(window, "Core output folder", start)
+        if not folder:
+            return
+        steps, force_csv = collect_outputs(folder)
+        if not steps:
+            QtWidgets.QMessageBox.warning(window, "CTform Results", f"No case_step_*.vtk in {folder}")
+            return
+        pipeline = doc.getObject("CTformResult")
+        if pipeline is None:
+            try:
+                pipeline = _load_pipeline(doc, steps, force_csv)
+            except Exception as error:
+                App.Console.PrintError(f"CTform: could not load the Core results into the 3D view: {error}\n")
+        try:
+            self._panel = open_panel(doc, folder, case_dir, pipeline)
+        except Exception as error:
+            QtWidgets.QMessageBox.warning(window, "CTform Results", f"Could not open the panel: {error}")
 
 
 class ExportCaseCommand:
@@ -775,6 +823,7 @@ Gui.addCommand("CTform_AssignMesh", AssignMeshCommand())
 Gui.addCommand("CTform_CreateContactPair", CreateContactPairCommand())
 Gui.addCommand("CTform_ExportCase", ExportCaseCommand())
 Gui.addCommand("CTform_RunCore", RunCoreCommand())
+Gui.addCommand("CTform_ResultsPanel", ResultsPanelCommand())
 Gui.addCommand("CTform_CreateWorkpiece", CreateWorkpieceCommand())
 Gui.addCommand("CTform_CreateTool", CreateToolCommand())
 Gui.addCommand("CTform_CreateLoadStep", CreateLoadStepCommand())

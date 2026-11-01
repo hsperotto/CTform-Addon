@@ -156,7 +156,7 @@ Principles:
 Sizes are rough (S: a few hours, M: a few days, L: more than a week) and assume one
 developer.
 
-### Phase 0: spike (S), next
+### Phase 0: spike (S), done on real Core output (probe9) instead of a synthetic fixture; see STATUS.md
 
 - Fixture generator (no FreeCAD) that writes `case_step_N.vtk` in Core's layout on the
   mesh of a probe package, with synthetic fields for two or three steps, and a matching

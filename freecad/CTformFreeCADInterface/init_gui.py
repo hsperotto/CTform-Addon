@@ -36,6 +36,7 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"CTform_CreateSolver",
 				"CTform_ExportCase",
 				"CTform_RunCore",
+				"CTform_ResultsPanel",
 			],
 		)
 		self.appendMenu(
@@ -49,6 +50,7 @@ class CTformFreeCADInterfaceWorkbench(Gui.Workbench):
 				"CTform_CreateSolver",
 				"CTform_ExportCase",
 				"CTform_RunCore",
+				"CTform_ResultsPanel",
 			],
 		)
 		self.appendMenu(
