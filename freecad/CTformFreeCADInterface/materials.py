@@ -46,7 +46,8 @@ class CTformMaterial:
         for name in ("HenselSpittelM1", "HenselSpittelM2", "HenselSpittelM3", "HenselSpittelM4"):
             add_property(obj, name, "App::PropertyFloat", "Hensel-Spittel", 0.0)
         add_property(obj, "HollomonK", "App::PropertyPressure", "Hollomon", 0.0)
-        for name in ("HollomonN", "HollomonEps0", "HollomonRateExponent"):
+        # HollomonReferenceStrainRate (1/s): sigma = K (eps0 + eps)^n (epsDot / ref)^m; 0 omits it.
+        for name in ("HollomonN", "HollomonEps0", "HollomonRateExponent", "HollomonReferenceStrainRate"):
             add_property(obj, name, "App::PropertyFloat", "Hollomon", 0.0)
         add_property(obj, "NortonHoffK", "App::PropertyPressure", "Norton-Hoff", 0.0)
         add_property(obj, "NortonHoffM", "App::PropertyFloat", "Norton-Hoff", 0.0)
@@ -206,6 +207,7 @@ def _apply_material_record(material, record: dict[str, Any]) -> None:
             "n": ("HollomonN", None),
             "eps0": ("HollomonEps0", None),
             "mRate": ("HollomonRateExponent", None),
+            "referenceStrainRate": ("HollomonReferenceStrainRate", None),
         },
         "NortonHoffViscoplastic": {
             "K": ("NortonHoffK", "Pa"),
@@ -420,6 +422,7 @@ def _constitutive_parameters(material: object, model: str) -> dict[str, float]:
             "n": ("HollomonN", None),
             "eps0": ("HollomonEps0", None),
             "mRate": ("HollomonRateExponent", None),
+            "referenceStrainRate": ("HollomonReferenceStrainRate", None),
         },
         "NortonHoffViscoplastic": {
             "K": ("NortonHoffK", "Pa"),
@@ -440,6 +443,8 @@ def _constitutive_parameters(material: object, model: str) -> dict[str, float]:
             output[key] = _quantity_si(material, property_name, unit)
         else:
             output[key] = float(getattr(material, property_name, 0.0))
+    if model == "Hollomon" and output.get("referenceStrainRate", 0.0) <= 0.0:
+        output.pop("referenceStrainRate", None)  # unset: Core keeps its default reference rate
     return output
 
 

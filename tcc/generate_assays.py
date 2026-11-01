@@ -25,6 +25,7 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_TOOL_MESH  tool-profile element size, mm (default 0.5)
     CTFORM_TCC_REMESH=1   export the remesh block (Core v2 on agent/v2-rigid-tool-segments); CTFORM_TCC_REMESH_*
                           set interval, min increments, max steps and h (mm); see REMESH_SETTINGS
+    CTFORM_TCC_MRATE / CTFORM_TCC_REF_RATE  Hollomon rate exponent m and reference strain rate (1/s) of the sheet
     CTFORM_TCC_MESH_SCALE   multiplies the 0.25 mm sheet element size
 """
 
@@ -87,6 +88,9 @@ REMESH_SETTINGS = {
     "RemeshHMax": float(os.environ.get("CTFORM_TCC_REMESH_H_MAX", "0.3")),
     "RemeshQualityMinScoreRetention": float(os.environ.get("CTFORM_TCC_REMESH_QUALITY_RETENTION", "0.5")),
 }
+# Optional strain-rate sensitivity of the sheet (round 3 proposal; not the thesis default). Unset = rate independent.
+M_RATE = os.environ.get("CTFORM_TCC_MRATE")
+REFERENCE_STRAIN_RATE = os.environ.get("CTFORM_TCC_REF_RATE")  # 1/s
 MESH_SCALE = float(os.environ.get("CTFORM_TCC_MESH_SCALE", "1"))
 
 
@@ -133,6 +137,10 @@ def build(shapes, punch_name, blank_name):
     }
     imported = {m.MaterialName: m for m in materials.import_material_catalog(doc, fem, case, CATALOG)}
     workpiece.Material = imported[MATERIAL]
+    if M_RATE is not None:
+        workpiece.Material.HollomonRateExponent = float(M_RATE)
+    if REFERENCE_STRAIN_RATE is not None:
+        workpiece.Material.HollomonReferenceStrainRate = float(REFERENCE_STRAIN_RATE)
     for tool in tools.values():
         tool.Material = imported["Rigid Tool Steel (placeholder)"]
         tool.ToolMeshSize = TOOL_MESH_SIZE

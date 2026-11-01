@@ -61,6 +61,8 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   block in metres, and the "Core v2 does not support remeshing" readiness issue is gone. Only Core branch
   `agent/v2-rigid-tool-segments` accepts it; Core `master` may still reject it. The TCC generator takes
   `CTFORM_TCC_REMESH=1` and `CTFORM_TCC_REMESH_*`; remesh packages are in `C:/ctf-probes/tcc-remesh`.
+- Round-3 preparation (branch `agent/tcc-run3`): Hollomon `referenceStrainRate` (1/s, Material `HollomonReferenceStrainRate`, imported and exported only when > 0; Core
+  reads it on `agent/v2-rate-reference`) and generator switches `CTFORM_TCC_MRATE` / `CTFORM_TCC_REF_RATE`. Defaults unchanged. Round-3 packages (`C:/ctf-probes/tcc-run3`) NOT generated yet: m = 0.01 and ref 1e-3 change the thesis material, needs the author's yes and Thay's ok.
 - 81 unit tests pass (`python -m unittest discover -s tests`; pytest is not
   installed on the PC).
 
