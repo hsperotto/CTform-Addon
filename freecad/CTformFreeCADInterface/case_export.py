@@ -74,6 +74,11 @@ def case_to_dict(
             "dimension": _value(solver, "Dimension", "2D"),
             "modelingType": _value(solver, "ModelingType", "axisymmetric"),
             "mechanicalFormulation": _value(solver, "MechanicalFormulation", "flow"),
+            **(
+                {"penalty": float(_value(solver, "ContactPenalty", 0.0))}
+                if float(_value(solver, "ContactPenalty", 0.0) or 0.0) > 0.0
+                else {}
+            ),
         },
         "geometry": geometry,
         "mesh": mesh_info or {},

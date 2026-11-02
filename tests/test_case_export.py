@@ -24,6 +24,15 @@ from freecad.CTformFreeCADInterface.loadsteps import CTformLoadStep, attach_cond
 
 
 class CaseExportTests(unittest.TestCase):
+    def test_contact_penalty_is_exported_as_simulation_penalty_only_when_set(self):
+        case = SimpleNamespace(SimulationName="demo", Process="forging", LoadStepsFile="l.json", ThermalFile="t.json")
+        base = dict(Dimension="2D", ModelingType="axisymmetric", MechanicalFormulation="displacement")
+
+        self.assertNotIn("penalty", case_to_dict(case, solver=SimpleNamespace(**base))["simulation"])
+        self.assertNotIn("penalty", case_to_dict(case, solver=SimpleNamespace(ContactPenalty=0.0, **base))["simulation"])
+        data = case_to_dict(case, solver=SimpleNamespace(ContactPenalty=1.0e15, **base))
+        self.assertEqual(data["simulation"]["penalty"], 1.0e15)
+
     def test_case_to_dict_matches_core_sections(self):
         case = SimpleNamespace(
             SimulationName="demo",

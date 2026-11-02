@@ -32,7 +32,8 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_HOLDER_FORCE_N   blank holder force in N, used as given (wins over HOLDER_PRESSURE); needs
                                 CTFORM_TCC_HOLDER_FORCE_SOURCE (text recorded in manifest.csv)
     CTFORM_TCC_RIM_SIZE     element size at the sheet rim, mm (radial grading from MESH_SIZE at the axis; 0 = uniform)
-    CTFORM_TCC_PENALTY      normal contact penalty of all pairs (exported as normal.penalty; unset = Core default)
+    CTFORM_TCC_PENALTY      normal contact penalty in N/mm3 for all pairs (exported as simulation.penalty in Pa/m =
+                            value x 1e9; unset = Core default)
     CTFORM_TCC_MESH_SIZE    sheet element size in mm (named parameter; wins over MESH_SCALE)
 Every run also writes manifest.csv (case, mu, mesh size, formulation, remesh, stroke, ...).
 """
@@ -131,7 +132,7 @@ M_RATE = os.environ.get("CTFORM_TCC_MRATE")
 REFERENCE_STRAIN_RATE = os.environ.get("CTFORM_TCC_REF_RATE")  # 1/s
 MESH_SCALE = float(os.environ.get("CTFORM_TCC_MESH_SCALE", "1"))
 # Named sheet element size in mm (overrides the 0.25 mm x MESH_SCALE default when set).
-PENALTY = float(os.environ.get("CTFORM_TCC_PENALTY", "0"))  # 0 = leave to Core
+PENALTY = float(os.environ.get("CTFORM_TCC_PENALTY", "0"))  # N/mm3; 0 = leave to Core
 RIM_SIZE = float(os.environ.get("CTFORM_TCC_RIM_SIZE", "0"))  # mm; 0 = uniform grid
 MESH_SIZE = float(os.environ.get("CTFORM_TCC_MESH_SIZE", 0.25 * MESH_SCALE))
 
@@ -157,6 +158,8 @@ def build(shapes, punch_name, blank_name):
     solver.Dimension = "2D"
     solver.ModelingType = "axisymmetric"
     solver.MechanicalFormulation = FORMULATION
+    if PENALTY > 0.0:
+        solver.ContactPenalty = PENALTY * 1e9  # N/mm3 -> Pa/m
     analysis.apply_isothermal_preset(solver)
     solver.ExportTargetCompression = False
     if REMESH:
@@ -206,8 +209,6 @@ def build(shapes, punch_name, blank_name):
         pair = contacts.make_contact_pair(doc, workpiece, tool)
         pair.FrictionModel = "coulomb" if FRICTION > 0 else "none"
         pair.FrictionCoefficient = FRICTION
-        if PENALTY > 0.0:
-            pair.Penalty = PENALTY
 
     stroke = float(STROKE_OVERRIDE) if STROKE_OVERRIDE else float(STROKE_MM[punch_name][blank_name])
     total = PUNCH_GAP + stroke

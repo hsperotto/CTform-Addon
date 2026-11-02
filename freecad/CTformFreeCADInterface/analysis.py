@@ -133,6 +133,8 @@ class CTformSolver:
             ("PenetrationTolerance", "Contact", 1e-2),
             ("GapTolerance", "Contact", 1e-6),
             ("ZBottom", "Contact", 0.0),
+            # Normal contact penalty for every interface, Pa/m (Core reads simulation.penalty); 0 = Core default.
+            ("ContactPenalty", "Contact", 0.0),
             ("PlaneTolerance", "Model", 1e-7),
             ("CoreTimeoutMinutes", "External Tools", 0.0),  # 0 = no limit
             # Remesh element sizes in mm (exported in metres); used when RemeshEnabled is on.
