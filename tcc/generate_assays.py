@@ -32,6 +32,7 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_HOLDER_FORCE_N   blank holder force in N, used as given (wins over HOLDER_PRESSURE); needs
                                 CTFORM_TCC_HOLDER_FORCE_SOURCE (text recorded in manifest.csv)
     CTFORM_TCC_RIM_SIZE     element size at the sheet rim, mm (radial grading from MESH_SIZE at the axis; 0 = uniform)
+    CTFORM_TCC_PENALTY      normal contact penalty of all pairs (exported as normal.penalty; unset = Core default)
     CTFORM_TCC_MESH_SIZE    sheet element size in mm (named parameter; wins over MESH_SCALE)
 Every run also writes manifest.csv (case, mu, mesh size, formulation, remesh, stroke, ...).
 """
@@ -130,6 +131,7 @@ M_RATE = os.environ.get("CTFORM_TCC_MRATE")
 REFERENCE_STRAIN_RATE = os.environ.get("CTFORM_TCC_REF_RATE")  # 1/s
 MESH_SCALE = float(os.environ.get("CTFORM_TCC_MESH_SCALE", "1"))
 # Named sheet element size in mm (overrides the 0.25 mm x MESH_SCALE default when set).
+PENALTY = float(os.environ.get("CTFORM_TCC_PENALTY", "0"))  # 0 = leave to Core
 RIM_SIZE = float(os.environ.get("CTFORM_TCC_RIM_SIZE", "0"))  # mm; 0 = uniform grid
 MESH_SIZE = float(os.environ.get("CTFORM_TCC_MESH_SIZE", 0.25 * MESH_SCALE))
 
@@ -204,6 +206,8 @@ def build(shapes, punch_name, blank_name):
         pair = contacts.make_contact_pair(doc, workpiece, tool)
         pair.FrictionModel = "coulomb" if FRICTION > 0 else "none"
         pair.FrictionCoefficient = FRICTION
+        if PENALTY > 0.0:
+            pair.Penalty = PENALTY
 
     stroke = float(STROKE_OVERRIDE) if STROKE_OVERRIDE else float(STROKE_MM[punch_name][blank_name])
     total = PUNCH_GAP + stroke
@@ -290,7 +294,7 @@ def main():
             summary.append((name, data["packageStatus"], data["readinessIssues"]))
             stroke = float(STROKE_OVERRIDE) if STROKE_OVERRIDE else float(STROKE_MM[punch_name][blank_name])
             manifest.append({
-                "case": name, "status": data["packageStatus"], "mu": FRICTION, "mesh_size_mm": MESH_SIZE, "rim_size_mm": RIM_SIZE or "",
+                "case": name, "status": data["packageStatus"], "mu": FRICTION, "mesh_size_mm": MESH_SIZE, "rim_size_mm": RIM_SIZE or "", "penalty": PENALTY or "",
                 "elements": data["mesh"]["elementCount"], "element_types": "|".join(data["mesh"]["elementTypes"]),
                 "formulation": data["simulation"]["mechanicalFormulation"], "material": MATERIAL, "remesh": data["remesh"].get("enabled"),
                 "stroke_mm": stroke, "increment_mm": INCREMENT_MM, "press_speed_mm_s": PRESS_SPEED,

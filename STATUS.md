@@ -3,6 +3,8 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- TCC generator takes `CTFORM_TCC_PENALTY` (normal contact penalty of all pairs, exported as `normal.penalty`; unset leaves
+  the Core default). Diagnostic package Receba/runs/validation-C/step2/mu0275_pen1e6. Branch agent/tcc-penalty.
 - Structured sheet mesh can grade the radial edges geometrically from `StructuredElementSize` at the axis to
   `StructuredRimSize` at the rim (generator `CTFORM_TCC_RIM_SIZE`, mm; the thickness keeps its element count). A band
   refinement only at r 40-45 mm is not possible without splitting the sheet face. Package
