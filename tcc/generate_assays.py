@@ -21,13 +21,13 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_PUNCH_GAP  initial punch-to-blank gap, mm (default 0 = as drawn)
     CTFORM_TCC_HOLDER_GAP initial holder-to-blank gap, mm (default 0 = as drawn)
     CTFORM_TCC_MU         Coulomb friction (0 exports friction none; default 0.2)
-    CTFORM_TCC_FORMULATION  flow (default) or displacement
+    CTFORM_TCC_FORMULATION  REQUIRED: flow or displacement (no default; the run aborts if unset)
     CTFORM_TCC_TOOL_MESH  tool-profile element size, mm (default 0.5)
     CTFORM_TCC_REMESH=1   export the remesh block (Core v2 on agent/v2-rigid-tool-segments); CTFORM_TCC_REMESH_*
                           set interval, min increments, max steps and h (mm); see REMESH_SETTINGS
     CTFORM_TCC_MRATE / CTFORM_TCC_REF_RATE  Hollomon rate exponent m and reference strain rate (1/s) of the sheet
     CTFORM_TCC_MESH_SCALE   multiplies the 0.25 mm sheet element size
-    CTFORM_TCC_MATERIAL     catalog material name of the sheet (default: Hollomon mean of 0/45/90 deg)
+    CTFORM_TCC_MATERIAL     REQUIRED: catalog material name of the sheet (no default; the run aborts if unset)
     CTFORM_TCC_MESH_SIZE    sheet element size in mm (named parameter; wins over MESH_SCALE)
 Every run also writes manifest.csv (case, mu, mesh size, formulation, remesh, stroke, ...).
 """
@@ -54,7 +54,27 @@ GMSH = os.environ.get("CTFORM_GMSH", r"C:\Program Files\FreeCAD 1.1\bin\gmsh.exe
 CATALOG = ROOT / "freecad" / "CTformFreeCADInterface" / "resources" / "materials" / (
     "aisi304-1mm-nunes2025.json"
 )
-MATERIAL = os.environ.get("CTFORM_TCC_MATERIAL", "AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)")
+
+
+def _fail(message):
+    # FreeCADCmd does not show the message of an exception raised at import time: print it first.
+    print("TCC ERROR:", message, file=sys.stderr, flush=True)
+    print("TCC ERROR:", message, flush=True)
+    raise RuntimeError(message)
+
+
+def _required(name, allowed=None):
+    """Read a choice the user must make knowingly: there is no default."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        _fail(f"{name} is required (no default). Set it explicitly before running.")
+    if allowed and value not in allowed:
+        _fail(f"{name}={value!r} is not valid; choose one of {sorted(allowed)}.")
+    return value
+
+
+FORMULATION = _required("CTFORM_TCC_FORMULATION", {"flow", "displacement"})
+MATERIAL = _required("CTFORM_TCC_MATERIAL")
 
 PUNCHES = ["Cilinder", "Hemisphere", "FlatElipse", "DeepElipse", "VeryDeepElipse"]
 BLANKS = ["Blank90", "Blank100", "Blank110"]
@@ -119,7 +139,7 @@ def build(shapes, punch_name, blank_name):
     solver = analysis.make_solver(doc, case)
     solver.Dimension = "2D"
     solver.ModelingType = "axisymmetric"
-    solver.MechanicalFormulation = os.environ.get("CTFORM_TCC_FORMULATION", "flow")
+    solver.MechanicalFormulation = FORMULATION
     analysis.apply_isothermal_preset(solver)
     solver.ExportTargetCompression = False
     if REMESH:
