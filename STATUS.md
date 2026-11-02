@@ -4,8 +4,9 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 
 ## Done
 - TCC generator has no default formulation or material: `CTFORM_TCC_FORMULATION` (flow|displacement) and
-  `CTFORM_TCC_MATERIAL` are required and the run aborts with `TCC ERROR` if unset or invalid. Branch
-  agent/tcc-explicit-formulation.
+  `CTFORM_TCC_MATERIAL` are required and the run aborts with `TCC ERROR` if unset or invalid. Merged into main.
+- TCC generator takes `CTFORM_TCC_HOLDER_PRESSURE` (MPa, default 5) for the blank holder force. Sensitivity
+  packages in Receba/runs/bh-sensitivity (7.5 and 10 MPa). Merged into main.
 - Results viewer force series uses `Force_Total` (normal + friction) when `press_force_by_tool.csv` has it
   (Core 4825fb9+), else `Force`. Merged into main.
 - TCC remesh sizes default to hBase = hMin = hMax = 0.25 mm (match the 0.25 mm structured Quad4 start mesh;

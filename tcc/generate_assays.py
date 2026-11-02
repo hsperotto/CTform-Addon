@@ -28,6 +28,7 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_MRATE / CTFORM_TCC_REF_RATE  Hollomon rate exponent m and reference strain rate (1/s) of the sheet
     CTFORM_TCC_MESH_SCALE   multiplies the 0.25 mm sheet element size
     CTFORM_TCC_MATERIAL     REQUIRED: catalog material name of the sheet (no default; the run aborts if unset)
+    CTFORM_TCC_HOLDER_PRESSURE  blank holder pressure, MPa (default 5; force = p x annulus area)
     CTFORM_TCC_MESH_SIZE    sheet element size in mm (named parameter; wins over MESH_SCALE)
 Every run also writes manifest.csv (case, mu, mesh size, formulation, remesh, stroke, ...).
 """
@@ -98,7 +99,7 @@ PUNCH_GAP = float(os.environ.get("CTFORM_TCC_PUNCH_GAP", "0"))
 HOLDER_GAP = float(os.environ.get("CTFORM_TCC_HOLDER_GAP", "0"))
 FRICTION = float(os.environ.get("CTFORM_TCC_MU", "0.2"))
 PRESS_SPEED = 19.5  # mm/s, Rocha (2022); placeholder
-PRESSURE_MPA = 5.0  # blank holder pressure; placeholder
+PRESSURE_MPA = float(os.environ.get("CTFORM_TCC_HOLDER_PRESSURE", "5.0"))  # blank holder pressure, MPa; 5 MPa is the thesis value
 TOOL_MESH_SIZE = float(os.environ.get("CTFORM_TCC_TOOL_MESH", "0.5"))  # mm; resolves the 5 mm radii
 REMESH = os.environ.get("CTFORM_TCC_REMESH") == "1"
 # Remesh settings; sizes in mm (exported in metres). Switches: CTFORM_TCC_REMESH_{INTERVAL,MIN_INC,MAX_STEPS,H_BASE,H_MIN,H_MAX}
