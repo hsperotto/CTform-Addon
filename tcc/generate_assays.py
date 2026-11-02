@@ -27,6 +27,9 @@ friction, mesh size. Optional switches:
                           set interval, min increments, max steps and h (mm); see REMESH_SETTINGS
     CTFORM_TCC_MRATE / CTFORM_TCC_REF_RATE  Hollomon rate exponent m and reference strain rate (1/s) of the sheet
     CTFORM_TCC_MESH_SCALE   multiplies the 0.25 mm sheet element size
+    CTFORM_TCC_MATERIAL     catalog material name of the sheet (default: Hollomon mean of 0/45/90 deg)
+    CTFORM_TCC_MESH_SIZE    sheet element size in mm (named parameter; wins over MESH_SCALE)
+Every run also writes manifest.csv (case, mu, mesh size, formulation, remesh, stroke, ...).
 """
 
 import json
@@ -51,7 +54,7 @@ GMSH = os.environ.get("CTFORM_GMSH", r"C:\Program Files\FreeCAD 1.1\bin\gmsh.exe
 CATALOG = ROOT / "freecad" / "CTformFreeCADInterface" / "resources" / "materials" / (
     "aisi304-1mm-nunes2025.json"
 )
-MATERIAL = "AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)"
+MATERIAL = os.environ.get("CTFORM_TCC_MATERIAL", "AISI 304 1 mm, mean of 0/45/90 deg (Nunes 2025)")
 
 PUNCHES = ["Cilinder", "Hemisphere", "FlatElipse", "DeepElipse", "VeryDeepElipse"]
 BLANKS = ["Blank90", "Blank100", "Blank110"]
@@ -92,6 +95,8 @@ REMESH_SETTINGS = {
 M_RATE = os.environ.get("CTFORM_TCC_MRATE")
 REFERENCE_STRAIN_RATE = os.environ.get("CTFORM_TCC_REF_RATE")  # 1/s
 MESH_SCALE = float(os.environ.get("CTFORM_TCC_MESH_SCALE", "1"))
+# Named sheet element size in mm (overrides the 0.25 mm x MESH_SCALE default when set).
+MESH_SIZE = float(os.environ.get("CTFORM_TCC_MESH_SIZE", 0.25 * MESH_SCALE))
 
 
 def faces_by_label(source):
@@ -149,13 +154,13 @@ def build(shapes, punch_name, blank_name):
     mesh.Shape = sheet
     mesh.ElementDimension = "2D"
     mesh.ElementOrder = "1st"
-    mesh.CharacteristicLengthMax = f"{0.25 * MESH_SCALE} mm"
-    mesh.CharacteristicLengthMin = f"{0.1 * MESH_SCALE} mm"
+    mesh.CharacteristicLengthMax = f"{MESH_SIZE} mm"
+    mesh.CharacteristicLengthMin = f"{0.4 * MESH_SIZE} mm"
     workpiece.Mesh = mesh
     workpiece.addObject(mesh)
     # Transfinite recombined Quad4 grid (4 elements through the 1 mm thickness).
     workpiece.StructuredSheetMesh = True
-    workpiece.StructuredElementSize = f"{0.25 * MESH_SCALE} mm"
+    workpiece.StructuredElementSize = f"{MESH_SIZE} mm"
     doc.recompute()
 
     for tool in tools.values():
@@ -213,6 +218,17 @@ def build(shapes, punch_name, blank_name):
     return doc, case
 
 
+def _commit():
+    try:
+        import subprocess
+        return subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], text=True).strip()
+    except Exception:
+        return ""
+
+
+COMMIT = _commit()
+
+
 def main():
     App.ParamGet("User parameter:BaseApp/Preferences/Mod/Fem/Gmsh").SetBool("UseStandardGmshLocation", False)
     App.ParamGet("User parameter:BaseApp/Preferences/Mod/Fem/Gmsh").SetString("gmshBinaryPath", GMSH)
@@ -223,6 +239,7 @@ def main():
         raise SystemExit(f"Geometrias.FCStd lacks faces: {missing}")
     only = {s for s in os.environ.get("CTFORM_TCC_ONLY", "").split(",") if s}
     summary = []
+    manifest = []
     for punch_name in PUNCHES:
         for blank_name in BLANKS:
             name = f"{punch_name}_{blank_name}"
@@ -234,9 +251,23 @@ def main():
             case_json = case_export.write_case_json(case, out)
             data = json.loads(case_json.read_text(encoding="utf-8"))
             summary.append((name, data["packageStatus"], data["readinessIssues"]))
+            stroke = float(STROKE_OVERRIDE) if STROKE_OVERRIDE else float(STROKE_MM[punch_name][blank_name])
+            manifest.append({
+                "case": name, "status": data["packageStatus"], "mu": FRICTION, "mesh_size_mm": MESH_SIZE,
+                "elements": data["mesh"]["elementCount"], "element_types": "|".join(data["mesh"]["elementTypes"]),
+                "formulation": data["simulation"]["mechanicalFormulation"], "material": MATERIAL, "remesh": data["remesh"].get("enabled"),
+                "stroke_mm": stroke, "increment_mm": INCREMENT_MM, "press_speed_mm_s": PRESS_SPEED,
+                "holder_pressure_MPa": PRESSURE_MPA, "punch_gap_mm": PUNCH_GAP, "addon_commit": COMMIT,
+            })
             print("TCC", name, data["packageStatus"], json.dumps(data["readinessIssues"]))
             App.closeDocument(doc.Name)
     (OUT / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
+    if manifest:
+        import csv
+        with open(OUT / "manifest.csv", "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(manifest[0]))
+            writer.writeheader()
+            writer.writerows(manifest)
     print("TCC done:", len(summary), "cases in", OUT)
 
 
