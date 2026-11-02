@@ -5,6 +5,9 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
 ## Done
 - Results viewer force series uses `Force_Total` (normal + friction) when `press_force_by_tool.csv` has it
   (Core 4825fb9+), else `Force`. Branch agent/results-force-total, not merged.
+- TCC remesh sizes default to hBase = hMin = hMax = 0.25 mm (match the 0.25 mm structured Quad4 start mesh;
+  the old 0.2/0.25/0.3 grew the element count ~3.5x and Core's ElementBudget refused every remesh).
+  Package set `C:/ctf-probes/tcc-quad4-remesh-h025` (3 blank-90 cases). On branch agent/tcc-remesh-h025, not merged.
 - TCC generator turns on `StructuredSheetMesh` (element size 0.25 mm x `CTFORM_TCC_MESH_SCALE`),
   so `workpiece.msh` is Quad4 (checked on Cilinder_Blank100: `elementTypes ["Quad4"]`, groups
   Edge1-4 and Face1 unchanged). No Tri3 validation added; Tri3 stays possible elsewhere. Batch not regenerated.
