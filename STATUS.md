@@ -3,6 +3,8 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- TCC generator takes `CTFORM_TCC_HOLDER_PRESSURE` (MPa, default 5) for the blank holder force. Sensitivity
+  packages in Receba/runs/bh-sensitivity (7.5 and 10 MPa). Branch agent/tcc-holder-pressure.
 - Results viewer force series uses `Force_Total` (normal + friction) when `press_force_by_tool.csv` has it
   (Core 4825fb9+), else `Force`. Merged into main.
 - TCC remesh sizes default to hBase = hMin = hMax = 0.25 mm (match the 0.25 mm structured Quad4 start mesh;
