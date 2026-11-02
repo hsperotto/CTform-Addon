@@ -105,6 +105,42 @@ class SwiftExportTests(unittest.TestCase):
         self.assertNotIn("referenceStrainRate", plain)
 
 
+HS = {"hardening": "HockettSherby", "sigma0": 210e6, "sigmaSat": 1200e6, "N": 8.0, "p": 0.7}
+
+
+def _hs_catalog(**changes):
+    parameters = dict(HS, **changes)
+    return {"materials": [{
+        "name": "HS", "constitutive": {"model": "ElastoPlasticIsotropic", "parameters": parameters},
+        "elastic": {"youngModulus": 2e11, "poissonRatio": 0.3}, "thermal": {"density": 8000.0},
+    }]}
+
+
+class HockettSherbyTests(unittest.TestCase):
+    def test_exports_the_four_parameters_and_the_hardening_name(self):
+        exported = material_to_dict(_material(
+            HockettSherbySigma0=210e6, HockettSherbySigmaSat=1200e6, HockettSherbyN=8.0, HockettSherbyP=0.7,
+            SwiftK=1e9, SwiftN=0.3, YieldStrength02=200e6,
+        ))["constitutive"]["parameters"]
+        self.assertEqual(exported, HS)
+
+    def test_record_round_trips(self):
+        material = _material()
+        _apply_material_record(material, _hs_catalog()["materials"][0])
+        self.assertEqual(material_to_dict(material)["constitutive"]["parameters"], HS)
+
+    def test_swift_export_is_unchanged_without_hockett_sherby(self):
+        exported = material_to_dict(_material(SwiftK=1318.3e6, SwiftN=0.35, YieldStrength02=217e6))
+        self.assertEqual(set(exported["constitutive"]["parameters"]), {"K", "n", "eps0"})
+
+    def test_readiness_rules_match_core(self):
+        self.assertEqual(material_readiness_issues(_hs_catalog()), [])
+        for bad in ({"sigma0": 0.0}, {"sigmaSat": 210e6}, {"N": 0.0}, {"p": -1.0}, {"hardening": "Voce"}):
+            with self.subTest(bad=bad):
+                self.assertEqual(len(material_readiness_issues(_hs_catalog(**bad))), 1)
+        self.assertEqual(material_readiness_issues(_hs_catalog(hardening="Swift", K=1e9, n=0.3, eps0=0.005)), [])
+
+
 class SwiftImportTests(unittest.TestCase):
     def test_catalog_record_round_trips_to_the_same_export(self):
         record = _catalog_records()["aisi304-1mm-ep-rd0"]

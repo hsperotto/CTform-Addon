@@ -3,6 +3,10 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- Material properties and export for Hockett-Sherby hardening (ElastoPlasticIsotropic parameters `hardening`,
+  `sigma0`, `sigmaSat`, `N`, `p`; Pa): on when HockettSherbySigmaSat > 0, takes precedence over Swift. Readiness follows
+  Core (sigma0 > 0, sigmaSat > sigma0, N > 0, p > 0; unknown `hardening` refused). No catalog entry yet: waiting for
+  the Fig. 22 fit. Branch agent/hockett-sherby, not merged.
 - TCC generator has no default formulation or material: `CTFORM_TCC_FORMULATION` (flow|displacement) and
   `CTFORM_TCC_MATERIAL` are required and the run aborts with `TCC ERROR` if unset or invalid. Merged into main.
 - TCC generator takes `CTFORM_TCC_HOLDER_PRESSURE` (MPa, default 5) for the blank holder force. Sensitivity
