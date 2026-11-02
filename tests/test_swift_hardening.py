@@ -141,6 +141,36 @@ class HockettSherbyTests(unittest.TestCase):
         self.assertEqual(material_readiness_issues(_hs_catalog(hardening="Swift", K=1e9, n=0.3, eps0=0.005)), [])
 
 
+VL = {"hardening": "VoceLudwik", "sigma0": 211e6, "Q": 170.9e6, "K": 2465.1e6, "b": 67.8, "n": 1.356, "epsLinear": 0.43}
+
+
+def _vl_catalog(**changes):
+    catalog = _hs_catalog()
+    catalog["materials"][0]["constitutive"]["parameters"] = dict(VL, **changes)
+    return catalog
+
+
+class VoceLudwikTests(unittest.TestCase):
+    def test_round_trip_and_precedence_over_hockett_sherby(self):
+        material = _material(HockettSherbySigma0=1.0, HockettSherbySigmaSat=2.0, HockettSherbyN=1.0, HockettSherbyP=1.0)
+        _apply_material_record(material, _vl_catalog()["materials"][0])
+        self.assertEqual(material_to_dict(material)["constitutive"]["parameters"], VL)
+
+    def test_readiness_rules_match_core(self):
+        self.assertEqual(material_readiness_issues(_vl_catalog()), [])
+        self.assertEqual(material_readiness_issues(_vl_catalog(Q=0.0, K=0.0, epsLinear=0.0)), [])
+        for bad in ({"sigma0": 0.0}, {"Q": -1.0}, {"b": 0.0}, {"K": -1.0}, {"n": 0.0}, {"epsLinear": -0.1}):
+            with self.subTest(bad=bad):
+                self.assertEqual(len(material_readiness_issues(_vl_catalog(**bad))), 1)
+
+    def test_catalog_entry_exports_the_fig22_fit(self):
+        record = _catalog_records()["aisi-304-1-mm-mean-voce-ludwik-fig22-nunes-2025"]
+        material = _material()
+        _apply_material_record(material, record)
+        self.assertEqual(material_to_dict(material)["constitutive"]["parameters"], VL)
+        self.assertEqual(material_readiness_issues({"materials": [record]}), [])
+
+
 class SwiftImportTests(unittest.TestCase):
     def test_catalog_record_round_trips_to_the_same_export(self):
         record = _catalog_records()["aisi304-1mm-ep-rd0"]

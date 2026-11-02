@@ -3,6 +3,9 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- Voce+Ludwik hardening (ElastoPlasticIsotropic `hardening: VoceLudwik`, sigma0, Q, K in Pa; b, n, epsLinear): properties,
+  export, import, readiness (Core rules) and catalog entry `aisi-304-1-mm-mean-voce-ludwik-fig22-nunes-2025`
+  (fit to Nunes Fig. 22, chart reading). Wins over Hockett-Sherby and Swift. Branch agent/voce-ludwik, not merged.
 - Material properties and export for Hockett-Sherby hardening (ElastoPlasticIsotropic parameters `hardening`,
   `sigma0`, `sigmaSat`, `N`, `p`; Pa): on when HockettSherbySigmaSat > 0, takes precedence over Swift. Readiness follows
   Core (sigma0 > 0, sigmaSat > sigma0, N > 0, p > 0; unknown `hardening` refused). No catalog entry yet: waiting for

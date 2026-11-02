@@ -62,6 +62,13 @@ class CTformMaterial:
         add_property(obj, "HockettSherbySigmaSat", "App::PropertyPressure", "Elastoplastic", 0.0)
         add_property(obj, "HockettSherbyN", "App::PropertyFloat", "Elastoplastic", 0.0)
         add_property(obj, "HockettSherbyP", "App::PropertyFloat", "Elastoplastic", 0.0)
+        # Voce + Ludwik: sigma = sigma0 + Q (1 - exp(-b epsP)) + K epsP^n, tangent line beyond epsLinear;
+        # on when VoceLudwikSigma0 > 0 (wins over Hockett-Sherby and Swift).
+        add_property(obj, "VoceLudwikSigma0", "App::PropertyPressure", "Elastoplastic", 0.0)
+        add_property(obj, "VoceLudwikQ", "App::PropertyPressure", "Elastoplastic", 0.0)
+        add_property(obj, "VoceLudwikK", "App::PropertyPressure", "Elastoplastic", 0.0)
+        for name in ("VoceLudwikB", "VoceLudwikN", "VoceLudwikEpsLinear"):
+            add_property(obj, name, "App::PropertyFloat", "Elastoplastic", 0.0)
         add_property(obj, "YoungModulus", "App::PropertyPressure", "Elastic", 0.0)
         add_property(obj, "PoissonRatio", "App::PropertyFloat", "Elastic", 0.3)
         add_property(obj, "Density", "App::PropertyDensity", "Thermal", 0.0)
@@ -226,7 +233,13 @@ def _apply_material_record(material, record: dict[str, Any]) -> None:
     for key, (property_name, unit) in parameter_fields.get(model, {}).items():
         if key in parameters:
             _set_imported_value(material, property_name, parameters[key], unit)
-    if model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "HockettSherby":
+    if model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "VoceLudwik":
+        for key, property_name in (("sigma0", "VoceLudwikSigma0"), ("Q", "VoceLudwikQ"), ("K", "VoceLudwikK")):
+            _set_imported_value(material, property_name, parameters[key], "Pa")
+        material.VoceLudwikB = float(parameters["b"])
+        material.VoceLudwikN = float(parameters["n"])
+        material.VoceLudwikEpsLinear = float(parameters.get("epsLinear", 0.0))
+    elif model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "HockettSherby":
         _set_imported_value(material, "HockettSherbySigma0", parameters["sigma0"], "Pa")
         _set_imported_value(material, "HockettSherbySigmaSat", parameters["sigmaSat"], "Pa")
         material.HockettSherbyN = float(parameters["N"])
@@ -366,6 +379,8 @@ def material_readiness_issues(catalog: dict[str, Any]) -> list[str]:
                 f"Material {name!r}: the flow-stress table must list every temperature x "
                 "strain rate x strain combination exactly once."
             )
+        elif model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "VoceLudwik":
+            issues.extend(_voce_ludwik_issues(name, parameters))
         elif model == "ElastoPlasticIsotropic" and parameters.get("hardening") not in (None, "Swift"):
             issues.extend(_hockett_sherby_issues(name, parameters))
         elif model == "ElastoPlasticIsotropic" and "K" in parameters:
@@ -381,6 +396,18 @@ def material_readiness_issues(catalog: dict[str, Any]) -> list[str]:
         if thermal.get("density", 0.0) <= 0.0:
             issues.append(f"Material {name!r} needs a positive density.")
     return issues
+
+
+def _voce_ludwik_issues(name: str, parameters: dict[str, Any]) -> list[str]:
+    """Core's rules: sigma0 > 0, Q >= 0, b > 0, K >= 0, n > 0, epsLinear >= 0 (0 = no tangent line)."""
+    ok = (
+        parameters.get("sigma0", 0.0) > 0.0 and parameters.get("Q", -1.0) >= 0.0
+        and parameters.get("b", 0.0) > 0.0 and parameters.get("K", -1.0) >= 0.0
+        and parameters.get("n", 0.0) > 0.0 and parameters.get("epsLinear", 0.0) >= 0.0
+    )
+    if ok:
+        return []
+    return [f"Material {name!r} needs sigma0 > 0, Q >= 0, b > 0, K >= 0, n > 0 and epsLinear >= 0 for Voce-Ludwik hardening."]
 
 
 def _hockett_sherby_issues(name: str, parameters: dict[str, Any]) -> list[str]:
@@ -423,6 +450,10 @@ def swift_eps0(yield_strength_02: float, K: float, n: float) -> float:
     return eps0
 
 
+def _voce_ludwik_enabled(material: object) -> bool:
+    return _quantity_si(material, "VoceLudwikSigma0", "Pa") > 0.0
+
+
 def _hockett_sherby_enabled(material: object) -> bool:
     return _quantity_si(material, "HockettSherbySigmaSat", "Pa") > 0.0
 
@@ -432,6 +463,16 @@ def _swift_enabled(material: object) -> bool:
 
 
 def _constitutive_parameters(material: object, model: str) -> dict[str, float]:
+    if model == "ElastoPlasticIsotropic" and _voce_ludwik_enabled(material):
+        return {
+            "hardening": "VoceLudwik",
+            "sigma0": _quantity_si(material, "VoceLudwikSigma0", "Pa"),
+            "Q": _quantity_si(material, "VoceLudwikQ", "Pa"),
+            "K": _quantity_si(material, "VoceLudwikK", "Pa"),
+            "b": float(getattr(material, "VoceLudwikB", 0.0)),
+            "n": float(getattr(material, "VoceLudwikN", 0.0)),
+            "epsLinear": float(getattr(material, "VoceLudwikEpsLinear", 0.0)),
+        }
     if model == "ElastoPlasticIsotropic" and _hockett_sherby_enabled(material):
         return {
             "hardening": "HockettSherby",
