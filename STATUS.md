@@ -3,6 +3,10 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- TCC generator takes `CTFORM_TCC_HOLDER_FORCE_N` (N, wins over pressure) and requires `CTFORM_TCC_HOLDER_FORCE_SOURCE`;
+  manifest.csv records `holder_force_N` and `holder_force_source`. validation-B packages (Receba/runs/validation-B)
+  use 23117.1 N = 2.5 MPa x holder face pi(60.6^2-27^2); the holder outer radius 60.6 is from the drawing, unverified.
+  Branch agent/tcc-holder-force, not merged.
 - TCC generator has no default formulation or material: `CTFORM_TCC_FORMULATION` (flow|displacement) and
   `CTFORM_TCC_MATERIAL` are required and the run aborts with `TCC ERROR` if unset or invalid. Merged into main.
 - TCC generator takes `CTFORM_TCC_HOLDER_PRESSURE` (MPa, default 5) for the blank holder force. Sensitivity

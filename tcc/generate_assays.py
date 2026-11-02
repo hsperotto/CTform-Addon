@@ -29,6 +29,8 @@ friction, mesh size. Optional switches:
     CTFORM_TCC_MESH_SCALE   multiplies the 0.25 mm sheet element size
     CTFORM_TCC_MATERIAL     REQUIRED: catalog material name of the sheet (no default; the run aborts if unset)
     CTFORM_TCC_HOLDER_PRESSURE  blank holder pressure, MPa (default 5; force = p x annulus area)
+    CTFORM_TCC_HOLDER_FORCE_N   blank holder force in N, used as given (wins over HOLDER_PRESSURE); needs
+                                CTFORM_TCC_HOLDER_FORCE_SOURCE (text recorded in manifest.csv)
     CTFORM_TCC_MESH_SIZE    sheet element size in mm (named parameter; wins over MESH_SCALE)
 Every run also writes manifest.csv (case, mu, mesh size, formulation, remesh, stroke, ...).
 """
@@ -100,6 +102,16 @@ HOLDER_GAP = float(os.environ.get("CTFORM_TCC_HOLDER_GAP", "0"))
 FRICTION = float(os.environ.get("CTFORM_TCC_MU", "0.2"))
 PRESS_SPEED = 19.5  # mm/s, Rocha (2022); placeholder
 PRESSURE_MPA = float(os.environ.get("CTFORM_TCC_HOLDER_PRESSURE", "5.0"))  # blank holder pressure, MPa; 5 MPa is the thesis value
+HOLDER_FORCE_N = os.environ.get("CTFORM_TCC_HOLDER_FORCE_N")
+HOLDER_FORCE_SOURCE = os.environ.get("CTFORM_TCC_HOLDER_FORCE_SOURCE", "").strip()
+if HOLDER_FORCE_N:
+    HOLDER_FORCE_N = float(HOLDER_FORCE_N)
+    if not HOLDER_FORCE_SOURCE:
+        print("TCC ERROR: CTFORM_TCC_HOLDER_FORCE_N needs CTFORM_TCC_HOLDER_FORCE_SOURCE (where the force comes from)", flush=True)
+        raise RuntimeError("CTFORM_TCC_HOLDER_FORCE_N needs CTFORM_TCC_HOLDER_FORCE_SOURCE")
+else:
+    HOLDER_FORCE_N = None
+    HOLDER_FORCE_SOURCE = HOLDER_FORCE_SOURCE or "pressure x annulus area pi(D0^2-54^2)/4 (hypothesis)"
 TOOL_MESH_SIZE = float(os.environ.get("CTFORM_TCC_TOOL_MESH", "0.5"))  # mm; resolves the 5 mm radii
 REMESH = os.environ.get("CTFORM_TCC_REMESH") == "1"
 # Remesh settings; sizes in mm (exported in metres). Switches: CTFORM_TCC_REMESH_{INTERVAL,MIN_INC,MAX_STEPS,H_BASE,H_MIN,H_MAX}
@@ -232,7 +244,7 @@ def build(shapes, punch_name, blank_name):
     holder_force.Direction = (down, ["Edge1"])
     blank_radius = sheet.Shape.BoundBox.XMax
     area = math.pi * (blank_radius ** 2 - HOLDER_FORCE_BORE_RADIUS ** 2)  # mm2, thesis formula
-    holder_force.Force = f"{PRESSURE_MPA * area} N"
+    holder_force.Force = f"{HOLDER_FORCE_N if HOLDER_FORCE_N is not None else PRESSURE_MPA * area} N"
     fem.addObject(holder_force)
     loadsteps.attach_condition(step, holder_force)
     doc.recompute()
@@ -278,7 +290,7 @@ def main():
                 "elements": data["mesh"]["elementCount"], "element_types": "|".join(data["mesh"]["elementTypes"]),
                 "formulation": data["simulation"]["mechanicalFormulation"], "material": MATERIAL, "remesh": data["remesh"].get("enabled"),
                 "stroke_mm": stroke, "increment_mm": INCREMENT_MM, "press_speed_mm_s": PRESS_SPEED,
-                "holder_pressure_MPa": PRESSURE_MPA, "punch_gap_mm": PUNCH_GAP, "addon_commit": COMMIT,
+                "holder_pressure_MPa": "" if HOLDER_FORCE_N is not None else PRESSURE_MPA, "holder_force_N": HOLDER_FORCE_N if HOLDER_FORCE_N is not None else "", "holder_force_source": HOLDER_FORCE_SOURCE, "punch_gap_mm": PUNCH_GAP, "addon_commit": COMMIT,
             })
             print("TCC", name, data["packageStatus"], json.dumps(data["readinessIssues"]))
             App.closeDocument(doc.Name)
