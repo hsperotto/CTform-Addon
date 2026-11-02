@@ -3,6 +3,10 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- Structured sheet mesh can grade the radial edges geometrically from `StructuredElementSize` at the axis to
+  `StructuredRimSize` at the rim (generator `CTFORM_TCC_RIM_SIZE`, mm; the thickness keeps its element count). A band
+  refinement only at r 40-45 mm is not possible without splitting the sheet face. Package
+  Receba/runs/validation-C/step2/mu0275_rimrefined (249 x 4 = 996 Quad4). Branch agent/tcc-rim-refine.
 - Voce+Ludwik hardening (ElastoPlasticIsotropic `hardening: VoceLudwik`, sigma0, Q, K in Pa; b, n, epsLinear): properties,
   export, import, readiness (Core rules) and catalog entry `aisi-304-1-mm-mean-voce-ludwik-fig22-nunes-2025`
   (fit to Nunes Fig. 22, chart reading). Wins over Hockett-Sherby and Swift. Branch agent/voce-ludwik, not merged.

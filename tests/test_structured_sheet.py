@@ -10,6 +10,7 @@ from pathlib import Path
 
 from freecad.CTformFreeCADInterface.gmsh_package import (
     inject_after_merge,
+    graded_rim_counts,
     structured_grid_lines,
 )
 
@@ -126,3 +127,25 @@ def _element_type_counts(path):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RimGradingTests(unittest.TestCase):
+    def test_grading_runs_from_axis_size_to_rim_size(self):
+        count, ratio = graded_rim_counts(45.0, 0.25, 0.125)
+        first = 45.0 * (1 - ratio) / (1 - ratio**count)
+        self.assertAlmostEqual(first, 0.25, delta=0.002)
+        self.assertAlmostEqual(first * ratio ** (count - 1), 0.125, delta=0.002)
+
+    def test_rim_lines_keep_four_elements_in_the_thickness_and_flip_with_the_edge_direction(self):
+        lines = structured_grid_lines(
+            [1, 2, 3, 4], [45, 1, 45, 1], 0.25, rim_size=0.125, rim_at_start=[False, False, True, False]
+        )
+        self.assertIn("Transfinite Curve {2, 4} = 5 Using Progression 1;", lines)
+        grading = [line for line in lines if "Transfinite Curve {1}" in line or "Transfinite Curve {3}" in line]
+        self.assertLess(float(grading[0].split("Progression")[1].strip(" ;")), 1.0)
+        self.assertGreater(float(grading[1].split("Progression")[1].strip(" ;")), 1.0)
+
+    def test_rim_grading_is_off_by_default(self):
+        lines = structured_grid_lines([1, 2, 3, 4], [45, 1, 45, 1], 0.25)
+        self.assertTrue(all("Progression 1;" in line for line in lines if "Curve" in line))
+

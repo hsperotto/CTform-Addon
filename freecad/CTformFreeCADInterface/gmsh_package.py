@@ -30,6 +30,7 @@ def export_gmsh_mesh(
     output_path: str | Path,
     *,
     structured_element_size: float | None = None,
+    structured_rim_size: float | None = None,
 ) -> dict[str, object]:
     """Run the assigned FEM Gmsh object and save its mesh as native Gmsh MSH2.
 
@@ -61,7 +62,7 @@ def export_gmsh_mesh(
     geo_text = _pin_physical_group_ids(geo_path.read_text(encoding="utf-8"))
     if structured_element_size is not None:
         geometry = getattr(mesh_object.Shape, "Shape", mesh_object.Shape)  # a feature link or a shape
-        lines = structured_sheet_lines(geometry, structured_element_size)
+        lines = structured_sheet_lines(geometry, structured_element_size, structured_rim_size)
         geo_text = inject_after_merge(geo_text, lines)
     geo_text += "\n// CTform package mesh export\n"
     geo_text += "Mesh.SaveAll = 0;\n"
@@ -163,7 +164,7 @@ def _physical_tag(dimension: int, name: str) -> int:
 _MERGE_LINE = re.compile(r'^\s*Merge\s+"[^"]*";\s*$', re.MULTILINE)
 
 
-def structured_sheet_lines(shape: object, element_size: float) -> list[str]:
+def structured_sheet_lines(shape: object, element_size: float, rim_size: float | None = None) -> list[str]:
     """Return the Gmsh lines for a structured Quad4 grid on the sheet face of ``shape``.
 
     The curve and surface tags are the FreeCAD indices of the edges and face, which
@@ -178,11 +179,17 @@ def structured_sheet_lines(shape: object, element_size: float) -> list[str]:
     if len(loop) != 4 or len(face.Edges) != 4:
         raise ValueError("Structured sheet meshing needs a face bounded by exactly four edges")
     edge_tags = [_shape_index(shape.Edges, edge) for edge in loop]
+    rim_at_start = None
+    if rim_size is not None:
+        # The rim is the end of each long (radial) edge farther from the axis (larger X).
+        rim_at_start = [edge.Vertexes[0].X >= edge.Vertexes[-1].X for edge in loop]
     return structured_grid_lines(
         edge_tags,
         [edge.Length for edge in loop],
         element_size,
         surface_tag=_shape_index(shape.Faces, face),
+        rim_size=rim_size,
+        rim_at_start=rim_at_start,
     )
 
 
@@ -191,6 +198,8 @@ def structured_grid_lines(
     lengths: list[float],
     element_size: float,
     surface_tag: int = 1,
+    rim_size: float | None = None,
+    rim_at_start: list[bool] | None = None,
 ) -> list[str]:
     """Return transfinite and recombine lines for a four-edge face.
 
@@ -216,12 +225,58 @@ def structured_grid_lines(
             f"for lengths {lengths} and size {element_size:g}"
         )
     nodes = [count + 1 for count in elements]
-    return [
-        f"Transfinite Curve {{{edge_tags[0]}, {edge_tags[2]}}} = {nodes[0]} Using Progression 1;",
-        f"Transfinite Curve {{{edge_tags[1]}, {edge_tags[3]}}} = {nodes[1]} Using Progression 1;",
+    if rim_size is None:
+        curve_lines = [
+            f"Transfinite Curve {{{edge_tags[0]}, {edge_tags[2]}}} = {nodes[0]} Using Progression 1;",
+            f"Transfinite Curve {{{edge_tags[1]}, {edge_tags[3]}}} = {nodes[1]} Using Progression 1;",
+        ]
+    else:
+        curve_lines = _rim_graded_lines(edge_tags, lengths, elements, element_size, rim_size, rim_at_start)
+    return curve_lines + [
         f"Transfinite Surface {{{surface_tag}}};",
         f"Recombine Surface {{{surface_tag}}};",
     ]
+
+
+def graded_rim_counts(length: float, axis_size: float, rim_size: float) -> tuple[int, float]:
+    """Return (elements, ratio) of a geometric grading that runs from ``axis_size`` to ``rim_size``.
+
+    ``ratio`` is the size factor from the axis end to the rim end per element (< 1 when the rim is finer).
+    The element count is the one whose first element is closest to ``axis_size``.
+    """
+    if rim_size <= 0.0 or axis_size <= 0.0:
+        raise ValueError("Element sizes must be positive")
+    best = None
+    for n in range(2, int(length / min(axis_size, rim_size)) + 3):
+        ratio = (rim_size / axis_size) ** (1.0 / (n - 1))
+        first = length / n if abs(ratio - 1.0) < 1e-12 else length * (1.0 - ratio) / (1.0 - ratio**n)
+        error = abs(first - axis_size)
+        if best is None or error < best[0]:
+            best = (error, n, ratio)
+    return best[1], best[2]
+
+
+def _rim_graded_lines(edge_tags, lengths, elements, element_size, rim_size, rim_at_start) -> list[str]:
+    """Grade the two long (radial) edges from ``element_size`` at the axis to ``rim_size`` at the rim.
+
+    The thickness edges keep their uniform count. Opposite radial edges get the same element count.
+    """
+    if rim_at_start is None or len(rim_at_start) != 4:
+        raise ValueError("A rim-graded sheet needs the rim end of each edge")
+    long_pair = (0, 2) if lengths[0] >= lengths[1] else (1, 3)
+    short_pair = (1, 3) if long_pair == (0, 2) else (0, 2)
+    count, ratio = graded_rim_counts(lengths[long_pair[0]], element_size, rim_size)
+    lines = [
+        f"Transfinite Curve {{{edge_tags[short_pair[0]]}, {edge_tags[short_pair[1]]}}} = "
+        f"{elements[short_pair[0]] + 1} Using Progression 1;"
+    ]
+    for index in long_pair:
+        # Gmsh grows the size by ``progression`` per element from the curve start.
+        progression = 1.0 / ratio if rim_at_start[index] else ratio
+        lines.append(
+            f"Transfinite Curve {{{edge_tags[index]}}} = {count + 1} Using Progression {progression:.12g};"
+        )
+    return lines
 
 
 def inject_after_merge(geo_text: str, lines: list[str]) -> str:

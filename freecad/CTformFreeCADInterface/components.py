@@ -36,6 +36,9 @@ class CTformWorkpiece:
         # A four-edge sheet face gets a transfinite Quad4 grid of square elements.
         add_property(obj, "StructuredSheetMesh", "App::PropertyBool", "Mesh", False)
         add_property(obj, "StructuredElementSize", "App::PropertyLength", "Mesh", 0.25)
+        # Element size at the sheet rim (outer edge); 0 keeps the uniform grid. The radial edges are graded
+        # geometrically from StructuredElementSize at the axis to this size at the rim.
+        add_property(obj, "StructuredRimSize", "App::PropertyLength", "Mesh", 0.0)
 
 
 class CTformTool:
