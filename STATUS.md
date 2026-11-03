@@ -15,15 +15,15 @@ Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refacto
   Receba/runs/validation-C/step2/mu0275_rimrefined (249 x 4 = 996 Quad4). Branch agent/tcc-rim-refine.
 - Voce+Ludwik hardening (ElastoPlasticIsotropic `hardening: VoceLudwik`, sigma0, Q, K in Pa; b, n, epsLinear): properties,
   export, import, readiness (Core rules) and catalog entry `aisi-304-1-mm-mean-voce-ludwik-fig22-nunes-2025`
-  (fit to Nunes Fig. 22, chart reading). Wins over Hockett-Sherby and Swift. Branch agent/voce-ludwik, not merged.
+  (fit to Nunes Fig. 22, chart reading). Wins over Hockett-Sherby and Swift. Merged into main.
 - Material properties and export for Hockett-Sherby hardening (ElastoPlasticIsotropic parameters `hardening`,
   `sigma0`, `sigmaSat`, `N`, `p`; Pa): on when HockettSherbySigmaSat > 0, takes precedence over Swift. Readiness follows
   Core (sigma0 > 0, sigmaSat > sigma0, N > 0, p > 0; unknown `hardening` refused). No catalog entry yet: waiting for
-  the Fig. 22 fit. Branch agent/hockett-sherby, not merged.
+  the Fig. 22 fit. Merged into main.
 - TCC generator takes `CTFORM_TCC_HOLDER_FORCE_N` (N, wins over pressure) and requires `CTFORM_TCC_HOLDER_FORCE_SOURCE`;
   manifest.csv records `holder_force_N` and `holder_force_source`. validation-B packages (Receba/runs/validation-B)
   use 23117.1 N = 2.5 MPa x holder face pi(60.6^2-27^2); the holder outer radius 60.6 is from the drawing, unverified.
-  Branch agent/tcc-holder-force, not merged.
+  Merged into main.
 - TCC generator has no default formulation or material: `CTFORM_TCC_FORMULATION` (flow|displacement) and
   `CTFORM_TCC_MATERIAL` are required and the run aborts with `TCC ERROR` if unset or invalid. Merged into main.
 - TCC generator takes `CTFORM_TCC_HOLDER_PRESSURE` (MPa, default 5) for the blank holder force. Sensitivity
