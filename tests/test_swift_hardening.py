@@ -105,77 +105,35 @@ class SwiftExportTests(unittest.TestCase):
         self.assertNotIn("referenceStrainRate", plain)
 
 
-HS = {"hardening": "HockettSherby", "sigma0": 210e6, "sigmaSat": 1200e6, "N": 8.0, "p": 0.7}
-
-
-def _hs_catalog(**changes):
-    parameters = dict(HS, **changes)
+def _ep_catalog(**changes):
+    parameters = dict(changes)
     return {"materials": [{
-        "name": "HS", "constitutive": {"model": "ElastoPlasticIsotropic", "parameters": parameters},
+        "name": "EP", "constitutive": {"model": "ElastoPlasticIsotropic", "parameters": parameters},
         "elastic": {"youngModulus": 2e11, "poissonRatio": 0.3}, "thermal": {"density": 8000.0},
     }]}
 
 
-class HockettSherbyTests(unittest.TestCase):
-    def test_exports_the_four_parameters_and_the_hardening_name(self):
-        exported = material_to_dict(_material(
-            HockettSherbySigma0=210e6, HockettSherbySigmaSat=1200e6, HockettSherbyN=8.0, HockettSherbyP=0.7,
-            SwiftK=1e9, SwiftN=0.3, YieldStrength02=200e6,
-        ))["constitutive"]["parameters"]
-        self.assertEqual(exported, HS)
+class UnsupportedHardeningTests(unittest.TestCase):
+    def test_hockett_sherby_and_unknown_names_are_refused(self):
+        for name in ("HockettSherby", "Voce"):
+            with self.subTest(name=name):
+                issues = material_readiness_issues(_ep_catalog(hardening=name))
+                self.assertEqual(len(issues), 1)
+                self.assertIn("not supported", issues[0])
 
-    def test_record_round_trips(self):
-        material = _material()
-        _apply_material_record(material, _hs_catalog()["materials"][0])
-        self.assertEqual(material_to_dict(material)["constitutive"]["parameters"], HS)
+    def test_swift_hardening_name_is_still_accepted(self):
+        self.assertEqual(material_readiness_issues(_ep_catalog(hardening="Swift", K=1e9, n=0.3, eps0=0.005)), [])
 
-    def test_swift_export_is_unchanged_without_hockett_sherby(self):
+    def test_swift_export_is_unchanged(self):
         exported = material_to_dict(_material(SwiftK=1318.3e6, SwiftN=0.35, YieldStrength02=217e6))
         self.assertEqual(set(exported["constitutive"]["parameters"]), {"K", "n", "eps0"})
-
-    def test_readiness_rules_match_core(self):
-        self.assertEqual(material_readiness_issues(_hs_catalog()), [])
-        for bad in ({"sigma0": 0.0}, {"sigmaSat": 210e6}, {"N": 0.0}, {"p": -1.0}, {"hardening": "Voce"}):
-            with self.subTest(bad=bad):
-                self.assertEqual(len(material_readiness_issues(_hs_catalog(**bad))), 1)
-        self.assertEqual(material_readiness_issues(_hs_catalog(hardening="Swift", K=1e9, n=0.3, eps0=0.005)), [])
-
-
-VL = {"hardening": "VoceLudwik", "sigma0": 211e6, "Q": 170.9e6, "K": 2465.1e6, "b": 67.8, "n": 1.356, "epsLinear": 0.43}
-
-
-def _vl_catalog(**changes):
-    catalog = _hs_catalog()
-    catalog["materials"][0]["constitutive"]["parameters"] = dict(VL, **changes)
-    return catalog
-
-
-class VoceLudwikTests(unittest.TestCase):
-    def test_round_trip_and_precedence_over_hockett_sherby(self):
-        material = _material(HockettSherbySigma0=1.0, HockettSherbySigmaSat=2.0, HockettSherbyN=1.0, HockettSherbyP=1.0)
-        _apply_material_record(material, _vl_catalog()["materials"][0])
-        self.assertEqual(material_to_dict(material)["constitutive"]["parameters"], VL)
-
-    def test_readiness_rules_match_core(self):
-        self.assertEqual(material_readiness_issues(_vl_catalog()), [])
-        self.assertEqual(material_readiness_issues(_vl_catalog(Q=0.0, K=0.0, epsLinear=0.0)), [])
-        for bad in ({"sigma0": 0.0}, {"Q": -1.0}, {"b": 0.0}, {"K": -1.0}, {"n": 0.0}, {"epsLinear": -0.1}):
-            with self.subTest(bad=bad):
-                self.assertEqual(len(material_readiness_issues(_vl_catalog(**bad))), 1)
-
-    def test_catalog_entry_exports_the_fig22_fit(self):
-        record = _catalog_records()["aisi-304-1-mm-mean-voce-ludwik-fig22-nunes-2025"]
-        material = _material()
-        _apply_material_record(material, record)
-        self.assertEqual(material_to_dict(material)["constitutive"]["parameters"], VL)
-        self.assertEqual(material_readiness_issues({"materials": [record]}), [])
 
 
 TABLE = [{"plasticStrain": 0.0, "stress": 211e6}, {"plasticStrain": 0.01, "stress": 300e6}, {"plasticStrain": 1.0, "stress": 900e6}]
 
 
 def _tab_catalog(table=TABLE):
-    catalog = _hs_catalog()
+    catalog = _ep_catalog()
     catalog["materials"][0]["constitutive"]["parameters"] = {"hardening": "Tabulated", "hardeningTable": table}
     return catalog
 
