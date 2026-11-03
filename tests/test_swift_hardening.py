@@ -171,6 +171,46 @@ class VoceLudwikTests(unittest.TestCase):
         self.assertEqual(material_readiness_issues({"materials": [record]}), [])
 
 
+TABLE = [{"plasticStrain": 0.0, "stress": 211e6}, {"plasticStrain": 0.01, "stress": 300e6}, {"plasticStrain": 1.0, "stress": 900e6}]
+
+
+def _tab_catalog(table=TABLE):
+    catalog = _hs_catalog()
+    catalog["materials"][0]["constitutive"]["parameters"] = {"hardening": "Tabulated", "hardeningTable": table}
+    return catalog
+
+
+class TabulatedHardeningTests(unittest.TestCase):
+    def test_round_trip_and_precedence(self):
+        material = _material(VoceLudwikSigma0=211e6, VoceLudwikQ=1.0, VoceLudwikB=1.0, VoceLudwikN=1.0)
+        _apply_material_record(material, _tab_catalog()["materials"][0])
+        self.assertEqual(
+            material_to_dict(material)["constitutive"]["parameters"],
+            {"hardening": "Tabulated", "hardeningTable": TABLE},
+        )
+
+    def test_readiness_rules(self):
+        self.assertEqual(material_readiness_issues(_tab_catalog()), [])
+        bad_tables = (
+            [],
+            TABLE[:1],
+            [{"plasticStrain": 0.001, "stress": 211e6}] + TABLE[1:],
+            [TABLE[0], TABLE[1], {"plasticStrain": 0.01, "stress": 400e6}],
+            [TABLE[0], {"plasticStrain": 0.01, "stress": 150e6}],
+            [TABLE[0], {"plasticStrain": 0.01}],
+        )
+        for table in bad_tables:
+            with self.subTest(table=table):
+                self.assertEqual(len(material_readiness_issues(_tab_catalog(table))), 1)
+
+    def test_catalog_entry_is_the_fig22_table(self):
+        record = _catalog_records()["aisi-304-1-mm-mean-tabulated-fig22-nunes-2025"]
+        table = record["constitutive"]["parameters"]["hardeningTable"]
+        self.assertEqual(len(table), 42)
+        self.assertEqual(table[0], {"plasticStrain": 0.0, "stress": 211000000.0})
+        self.assertEqual(material_readiness_issues({"materials": [record]}), [])
+
+
 class SwiftImportTests(unittest.TestCase):
     def test_catalog_record_round_trips_to_the_same_export(self):
         record = _catalog_records()["aisi304-1mm-ep-rd0"]

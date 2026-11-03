@@ -64,6 +64,8 @@ class CTformMaterial:
         add_property(obj, "HockettSherbyP", "App::PropertyFloat", "Elastoplastic", 0.0)
         # Voce + Ludwik: sigma = sigma0 + Q (1 - exp(-b epsP)) + K epsP^n, tangent line beyond epsLinear;
         # on when VoceLudwikSigma0 > 0 (wins over Hockett-Sherby and Swift).
+        # Tabulated hardening: JSON list of {plasticStrain, stress [Pa]}; on when non-empty (wins over all others).
+        add_property(obj, "HardeningTableJSON", "App::PropertyString", "Elastoplastic", "[]")
         add_property(obj, "VoceLudwikSigma0", "App::PropertyPressure", "Elastoplastic", 0.0)
         add_property(obj, "VoceLudwikQ", "App::PropertyPressure", "Elastoplastic", 0.0)
         add_property(obj, "VoceLudwikK", "App::PropertyPressure", "Elastoplastic", 0.0)
@@ -233,7 +235,9 @@ def _apply_material_record(material, record: dict[str, Any]) -> None:
     for key, (property_name, unit) in parameter_fields.get(model, {}).items():
         if key in parameters:
             _set_imported_value(material, property_name, parameters[key], unit)
-    if model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "VoceLudwik":
+    if model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "Tabulated":
+        material.HardeningTableJSON = json.dumps(parameters["hardeningTable"])
+    elif model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "VoceLudwik":
         for key, property_name in (("sigma0", "VoceLudwikSigma0"), ("Q", "VoceLudwikQ"), ("K", "VoceLudwikK")):
             _set_imported_value(material, property_name, parameters[key], "Pa")
         material.VoceLudwikB = float(parameters["b"])
@@ -379,6 +383,8 @@ def material_readiness_issues(catalog: dict[str, Any]) -> list[str]:
                 f"Material {name!r}: the flow-stress table must list every temperature x "
                 "strain rate x strain combination exactly once."
             )
+        elif model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "Tabulated":
+            issues.extend(_tabulated_hardening_issues(name, parameters))
         elif model == "ElastoPlasticIsotropic" and parameters.get("hardening") == "VoceLudwik":
             issues.extend(_voce_ludwik_issues(name, parameters))
         elif model == "ElastoPlasticIsotropic" and parameters.get("hardening") not in (None, "Swift"):
@@ -396,6 +402,25 @@ def material_readiness_issues(catalog: dict[str, Any]) -> list[str]:
         if thermal.get("density", 0.0) <= 0.0:
             issues.append(f"Material {name!r} needs a positive density.")
     return issues
+
+
+def _tabulated_hardening_issues(name: str, parameters: dict[str, Any]) -> list[str]:
+    """Core's rules: plasticStrain increasing from 0, stress positive and non-decreasing."""
+    table = parameters.get("hardeningTable")
+    problem = f"Material {name!r}: the hardening table needs plasticStrain increasing from 0 and non-decreasing positive stress."
+    if not isinstance(table, list) or len(table) < 2:
+        return [problem]
+    try:
+        strains = [float(point["plasticStrain"]) for point in table]
+        stresses = [float(point["stress"]) for point in table]
+    except (KeyError, TypeError, ValueError):
+        return [problem]
+    ok = (
+        strains[0] == 0.0 and stresses[0] > 0.0
+        and all(b > a for a, b in zip(strains, strains[1:]))
+        and all(b >= a for a, b in zip(stresses, stresses[1:]))
+    )
+    return [] if ok else [problem]
 
 
 def _voce_ludwik_issues(name: str, parameters: dict[str, Any]) -> list[str]:
@@ -450,6 +475,15 @@ def swift_eps0(yield_strength_02: float, K: float, n: float) -> float:
     return eps0
 
 
+def _hardening_table(material: object) -> list[Any]:
+    raw = str(getattr(material, "HardeningTableJSON", "[]") or "[]")
+    try:
+        table = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    return table if isinstance(table, list) else []
+
+
 def _voce_ludwik_enabled(material: object) -> bool:
     return _quantity_si(material, "VoceLudwikSigma0", "Pa") > 0.0
 
@@ -463,6 +497,8 @@ def _swift_enabled(material: object) -> bool:
 
 
 def _constitutive_parameters(material: object, model: str) -> dict[str, float]:
+    if model == "ElastoPlasticIsotropic" and _hardening_table(material):
+        return {"hardening": "Tabulated", "hardeningTable": _hardening_table(material)}
     if model == "ElastoPlasticIsotropic" and _voce_ludwik_enabled(material):
         return {
             "hardening": "VoceLudwik",

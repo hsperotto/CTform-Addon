@@ -209,6 +209,197 @@
       }
     },
     {
+      "id": "aisi-304-1-mm-mean-tabulated-fig22-nunes-2025",
+      "name": "AISI 304 1 mm, mean, tabulated Fig22 (Nunes 2025)",
+      "source": "Hardening table read from the Fig. 22 of Nunes 2025 (mean of 3 directions, epP = phi - sigma/E; first point Rp0.2 = 211 MPa; last point at epP = 1.0 on the fitted line); copied from Receba/runs/material-table/hardening_table_Pa.json",
+      "constitutive": {
+        "model": "ElastoPlasticIsotropic",
+        "parameters": {
+          "hardening": "Tabulated",
+          "hardeningTable": [
+            {
+              "plasticStrain": 0.0,
+              "stress": 211000000.0
+            },
+            {
+              "plasticStrain": 0.0085,
+              "stress": 300100000.0
+            },
+            {
+              "plasticStrain": 0.01828,
+              "stress": 343800000.0
+            },
+            {
+              "plasticStrain": 0.02814,
+              "stress": 371100000.0
+            },
+            {
+              "plasticStrain": 0.03804,
+              "stress": 391200000.0
+            },
+            {
+              "plasticStrain": 0.04795,
+              "stress": 409700000.0
+            },
+            {
+              "plasticStrain": 0.05786,
+              "stress": 427100000.0
+            },
+            {
+              "plasticStrain": 0.06778,
+              "stress": 444300000.0
+            },
+            {
+              "plasticStrain": 0.0777,
+              "stress": 460100000.0
+            },
+            {
+              "plasticStrain": 0.08762,
+              "stress": 476100000.0
+            },
+            {
+              "plasticStrain": 0.09754,
+              "stress": 491200000.0
+            },
+            {
+              "plasticStrain": 0.10747,
+              "stress": 506400000.0
+            },
+            {
+              "plasticStrain": 0.11739,
+              "stress": 521500000.0
+            },
+            {
+              "plasticStrain": 0.12732,
+              "stress": 536600000.0
+            },
+            {
+              "plasticStrain": 0.13724,
+              "stress": 551900000.0
+            },
+            {
+              "plasticStrain": 0.14716,
+              "stress": 567800000.0
+            },
+            {
+              "plasticStrain": 0.15708,
+              "stress": 584100000.0
+            },
+            {
+              "plasticStrain": 0.167,
+              "stress": 600100000.0
+            },
+            {
+              "plasticStrain": 0.17691,
+              "stress": 617500000.0
+            },
+            {
+              "plasticStrain": 0.18683,
+              "stress": 634500000.0
+            },
+            {
+              "plasticStrain": 0.19675,
+              "stress": 650300000.0
+            },
+            {
+              "plasticStrain": 0.20666,
+              "stress": 668700000.0
+            },
+            {
+              "plasticStrain": 0.21656,
+              "stress": 687600000.0
+            },
+            {
+              "plasticStrain": 0.22647,
+              "stress": 707000000.0
+            },
+            {
+              "plasticStrain": 0.23637,
+              "stress": 726900000.0
+            },
+            {
+              "plasticStrain": 0.24626,
+              "stress": 747100000.0
+            },
+            {
+              "plasticStrain": 0.25616,
+              "stress": 768100000.0
+            },
+            {
+              "plasticStrain": 0.26605,
+              "stress": 789400000.0
+            },
+            {
+              "plasticStrain": 0.27594,
+              "stress": 811100000.0
+            },
+            {
+              "plasticStrain": 0.28584,
+              "stress": 832800000.0
+            },
+            {
+              "plasticStrain": 0.29572,
+              "stress": 855200000.0
+            },
+            {
+              "plasticStrain": 0.30561,
+              "stress": 877800000.0
+            },
+            {
+              "plasticStrain": 0.3155,
+              "stress": 900600000.0
+            },
+            {
+              "plasticStrain": 0.32538,
+              "stress": 923300000.0
+            },
+            {
+              "plasticStrain": 0.33527,
+              "stress": 945600000.0
+            },
+            {
+              "plasticStrain": 0.34516,
+              "stress": 967900000.0
+            },
+            {
+              "plasticStrain": 0.35505,
+              "stress": 990400000.0
+            },
+            {
+              "plasticStrain": 0.36494,
+              "stress": 1012400000.0
+            },
+            {
+              "plasticStrain": 0.37483,
+              "stress": 1034099999.9999999
+            },
+            {
+              "plasticStrain": 0.38472,
+              "stress": 1055400000.0000001
+            },
+            {
+              "plasticStrain": 0.39462,
+              "stress": 1075400000.0
+            },
+            {
+              "plasticStrain": 1.0,
+              "stress": 2425400000.0
+            }
+          ]
+        }
+      },
+      "elastic": {
+        "youngModulus": 200000000000.0,
+        "poissonRatio": 0.3
+      },
+      "thermal": {
+        "density": 8000.0,
+        "thermalExpansionCoefficient": 1.73e-05,
+        "thermalConductivity": 16.2,
+        "specificHeat": 500.0
+      }
+    },
+    {
       "id": "rigid-tool-steel",
       "name": "Rigid Tool Steel (placeholder)",
       "constitutive": {

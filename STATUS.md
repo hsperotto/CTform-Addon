@@ -3,6 +3,10 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
+- Tabulated elastoplastic hardening (`hardening: Tabulated`, `hardeningTable` [{plasticStrain, stress Pa}]): Material
+  property `HardeningTableJSON`, export/import, readiness (strain increasing from 0, stress positive non-decreasing),
+  catalog entry `aisi-304-1-mm-mean-tabulated-fig22-nunes-2025` (42 points copied from
+  Receba/runs/material-table/hardening_table_Pa.json). Wins over Voce-Ludwik. Branch agent/tcc-tabulated.
 - TCC generator takes `CTFORM_TCC_PENALTY` (N/mm3, exported as `simulation.penalty` in Pa/m = value x 1e9 from the Solver property
   `ContactPenalty`, which is what Core reads; the per-interface `normal.penalty` is ignored by Core; unset leaves the Core default). Diagnostic package Receba/runs/validation-C/step2/mu0275_pen1e6. Branch agent/tcc-penalty.
 - Structured sheet mesh can grade the radial edges geometrically from `StructuredElementSize` at the axis to
