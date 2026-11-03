@@ -86,8 +86,9 @@ PUNCHES = ["Cilinder", "Hemisphere", "FlatElipse", "DeepElipse", "VeryDeepElipse
 BLANKS = ["Blank90", "Blank100", "Blank110"]
 
 # Punch travel from first contact, mm (Thay: Nunes 2025 Figs. 24/26/28, +-1 mm, rounded up to
-# multiples of 5; source CTform-Thesis tools/casematrix.py STROKE_MM). VeryDeepElipse D90 is
-# not an experiment in the thesis: it repeats the 100 mm value per Thay's table.
+# multiples of 5; source CTform-Thesis tools/casematrix.py STROKE_MM). VeryDeepElipse Blank90 (55 mm) is an
+# experiment: Nunes Fig. 24 ends at 51 mm, rounded up to 55 (per the Core session, 2026-11-02). Only
+# VeryDeepElipse Blank110 (not tested) repeats the 100 mm value.
 STROKE_MM = {
     "Cilinder": {"Blank90": 30, "Blank100": 40, "Blank110": 30},
     "FlatElipse": {"Blank90": 35, "Blank100": 40, "Blank110": 35},
