@@ -1,7 +1,7 @@
 # CTform FreeCAD Manual Smoke Test (full GUI run)
 
 One sitting, top to bottom, in the FreeCAD GUI. It builds the thesis case
-**Cilinder_Blank100** by hand (cylindrical punch, 100 mm blank), exports it, runs the
+**Cilinder_Blank90** by hand (cylindrical punch, 90 mm blank: the demo case that matches the validation), exports it, runs the
 Core, opens the results, saves and reopens the document, and then tries the things that
 should be refused. Every step says what to do, what must happen (**Pass**), and what
 usually goes wrong (**Watch**). Where a screenshot is needed for the thesis it says
@@ -33,7 +33,7 @@ Report view. A step that fails does not stop the run unless it says **STOP**.
    `C:\ctf-smoke\run1-reopen` (export after reopen). Create `...\capturas` if missing.
 3. Have the Core executable path ready (`ctform3_cli.exe`) and note whether the
    `CTFORM_CORE` environment variable is set. Find a known good case for the Core
-   (for example `C:\Users\henri\Desktop\TCC\Receba\runs\validation-H\Blank100\Cilinder_Blank100`)
+   (for example `C:\Users\henri\Desktop\TCC\Receba\runs\validation-G\step3\Cilinder_Blank90`)
    in case the new package needs a comparison.
 4. Quick environment check, in the Python console:
    ```python
@@ -97,7 +97,7 @@ Use the supplied drawing so the case matches the thesis.
    and the other four punches. Sketch X is the radius, sketch Y the axial coordinate, mm.
    - Pass: the faces are visible and are planar (Part::Face).
    - Watch: this is the only place where geometry comes from; do not edit it.
-2. Copy the four faces you need (`Cilinder`, `Die`, `BlankHolder`, `Blank100`) into the new
+2. Copy the four faces you need (`Cilinder`, `Die`, `BlankHolder`, `Blank90`) into the new
    document (select, Ctrl+C, switch to the new document, Ctrl+V; or Edit > Paste). If paste
    gives non-parametric copies, that is fine.
    - Watch: after pasting, check the faces did not move: punch nose and blank top at y = 0,
@@ -106,7 +106,7 @@ Use the supplied drawing so the case matches the thesis.
 
 ## 3. Components and materials
 
-1. Select the `Blank100` face, run **Create Workpiece**.
+1. Select the `Blank90` face, run **Create Workpiece**.
    - Pass: one Workpiece folder, linked to the shape.
 2. One at a time select `Cilinder` -> **Create Tool** and name it `Punch`; `Die` -> `Die`;
    `BlankHolder` -> `BlankHolder`.
@@ -132,15 +132,15 @@ Use the supplied drawing so the case matches the thesis.
 
 ## 4. Mesh
 
-1. Select the Blank100 face inside the Workpiece folder, run native **FEM_MeshGmshFromShape**.
+1. Select the Blank90 face inside the Workpiece folder, run native **FEM_MeshGmshFromShape**.
    Set `ElementOrder` = `1st`, `ElementDimension` = `2D`, Max size `0.25 mm`, Min size `0.1 mm`.
    Do not run it yet.
 2. Select the Workpiece folder and set (property panel, group Mesh):
    `StructuredSheetMesh` = true, `StructuredElementSize` = `0.25 mm`, `StructuredRimSize` = `0 mm`.
 3. Generate the mesh.
-   - Pass: 800 elements (all Quad4), 4 through the 1 mm thickness. Check **FEM_MeshDisplayInfo**
+   - Pass: 720 elements, 905 nodes (all Quad4), 4 through the 1 mm thickness. Check **FEM_MeshDisplayInfo**
      in the toolbar: node and element counts.
-   - Watch: an element count different from 800 means the edge lengths are not whole
+   - Watch: an element count different from 720 means the edge lengths are not whole
      multiples of the size; the export warns about it (step 9).
    - Watch: Gmsh errors in the Report view.
 4. Select the Workpiece folder and the mesh together, run **Assign FEM Mesh to CTform Component**.
@@ -164,11 +164,11 @@ Use the supplied drawing so the case matches the thesis.
 ## 6. Load step and conditions
 
 1. Run **Create Load Step**. Set `StepName` = `Press`, `StartTime` = `0`,
-   `EndTime` = `2.0513` (40 mm / 19.5 mm/s), `Increments` = `134` (40 / 0.3 mm), `Active` true.
+   `EndTime` = `1.5385` (30 mm / 19.5 mm/s = 1.53846...; give as many digits as the field accepts), `Increments` = `100` (30 / 0.3 mm), `Active` true.
    - Watch: the property editor shows `EndTime` before `StartTime` (known UI quirk).
 2. Create a native FEM **Displacement** condition (do not preselect geometry): click **Add**,
    select the punch face in the 3D view, confirm. Set `xFree` true, `yFree` false,
-   `yDisplacement` = `-40 mm`, `zFree` true. Select the condition and the step together and
+   `yDisplacement` = `-30 mm`, `zFree` true. Select the condition and the step together and
    run **Attach Selected Condition to Load Step**.
    - Pass: the condition is a child of the step.
 3. Create a native FEM **Fixed** condition on the Die face; drag it onto the step.
@@ -185,7 +185,7 @@ Use the supplied drawing so the case matches the thesis.
      arrow in the 3D view points toward the blank.
    - **SHOT S09** the step with its four children in the tree plus the Force direction arrow
      in the 3D view.
-6. Add an extra step "Hold" (time 2.0513-3), then select **Press** and run **Clone Load Step**.
+6. Add an extra step "Hold" (time 1.5385-3), then select **Press** and run **Clone Load Step**.
    - Pass: the clone has a new unique `StepId`, copies of the conditions that still reference
      the same geometry, is registered in the case. Edit the Force of the clone and check the
      source step did not change.
@@ -206,15 +206,15 @@ Use the supplied drawing so the case matches the thesis.
    `thermal.json`, `workpiece.msh`, `geometry\workpiece.dxf`, `geometry\tools\*.dxf` (3 tools).
    - Pass: all exist; `case.json` has `schemaVersion: 2`, `packageStatus: ready`,
      `readinessIssues: []`, `simulation.mechanicalFormulation: displacement`,
-     `simulation.penalty: 1e15`, mesh `elementCount: 800`, `elementTypes: ["Quad4"]`.
-   - Pass: `loadsteps.json` has one step, `Increments` 134, the punch displacement `-0.04` m,
+     `simulation.penalty: 1e15`, mesh `elementCount: 720`, `elementTypes: ["Quad4"]`.
+   - Pass: `loadsteps.json` has one step, `Increments` 100, the punch displacement `-0.03` m,
      the die fixed, the axis BC, and the BlankHolder force `50301.45` N.
    - Pass: `materials.json` has the tabulated material once with 42 table points, and the
      rigid tool material once.
    - Pass: `thermal.json` has the isothermal values (plastic efficiency 0, 293.15 K).
    - **SHOT S11** the exported package folder in the file explorer.
 3. Compare with the reference package:
-   `C:\Users\henri\Desktop\TCC\Receba\runs\validation-H\Blank100\Cilinder_Blank100`
+   `C:\Users\henri\Desktop\TCC\Receba\runs\validation-G\step3\Cilinder_Blank90`
    (same case made by the generator). In a terminal (outside FreeCAD):
    ```
    fc /b <reference>\workpiece.msh C:\ctf-smoke\run1\workpiece.msh
@@ -223,7 +223,7 @@ Use the supplied drawing so the case matches the thesis.
    - Pass: identical, or the only differences are in `packageDescription`/names/paths and
      floating-point noise. Record every other difference: it is a bug in either the GUI
      route or the generator.
-   - Watch: the mesh must be the structured one (800 Quad4); a Tri3 mesh means
+   - Watch: the mesh must be the structured one (720 Quad4); a Tri3 mesh means
      `StructuredSheetMesh` did not take effect.
 4. Export a **second time** into the same folder.
    - Pass: files overwritten, no stale files, same hash for `workpiece.msh`

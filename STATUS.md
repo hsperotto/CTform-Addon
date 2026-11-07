@@ -3,7 +3,7 @@
 Details and design rules: `DEVELOPMENT-CONTEXT.md`. Core contract: `Core-Refactor.md`.
 
 ## Done
-- `MANUAL-SMOKE-TEST.md` rewritten (branch agent/smoke-test-full): one full GUI run for Cilinder_Blank100 (case, solver, mesh, contact, load step, export, diff against validation-H, Run Core, results panel, save/reopen, 19 guardrails), a result sheet and 16 thesis screenshot points (S01-S16). Not yet executed by anyone.
+- `MANUAL-SMOKE-TEST.md` rewritten (merged into main): one full GUI run for Cilinder_Blank100 (case, solver, mesh, contact, load step, export, diff against validation-H, Run Core, results panel, save/reopen, 19 guardrails), a result sheet and 16 thesis screenshot points (S01-S16). Not yet executed by anyone.
 - Tabulated elastoplastic hardening (`hardening: Tabulated`, `hardeningTable` [{plasticStrain, stress Pa}]): Material
   property `HardeningTableJSON`, export/import, readiness (strain increasing from 0, stress positive non-decreasing),
   catalog entry `aisi-304-1-mm-mean-tabulated-fig22-nunes-2025` (42 points copied from
